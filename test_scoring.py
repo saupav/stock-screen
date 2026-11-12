@@ -168,6 +168,16 @@ wide = opt_study(100.0, 125.0, bt, {"2027-06-18": {"calls": [q(100, 1, 9), q(125
 check(all(not x["liquid"] for x in wide["structures"] if x["kind"] != "shares") and wide["best"] == "Shares (no options)", "wide or empty quotes are illiquid; falls back to shares")
 json.dumps(o, allow_nan=False)
 
+# ---- best today
+import screen as _screen
+ops = [{"ticker": "A", "verdict": "ADD-REVIEW", "score": 0.5, "best": "Shares (no options)", "best_detail": {"cost_per_contract": 100}},
+       {"ticker": "B", "verdict": None, "score": 2.0, "best": "Long call", "best_detail": {}},
+       {"ticker": "C", "verdict": "ADD-REVIEW (flagged)", "score": -0.1, "best": "Long call", "best_detail": {}},
+       {"ticker": "D", "verdict": "ADD-REVIEW (masters-confirmed)", "score": 0.3, "best": "Bull call spread", "best_detail": {}}]
+bt_ = _screen.best_today(ops, {"A": {"name": "Alpha"}}, {"A": {"episodes": 4, "median_full_months": 6}})
+check([x["ticker"] for x in bt_] == ["A", "D"] and bt_[0]["name"] == "Alpha" and bt_[0]["median_recovery_months"] == 6,
+      "best today: ADD-REVIEW only, positive scores, in ranking order, with name and recovery time")
+
 # ---- strategies and attention
 import os as _os
 import numpy as _np

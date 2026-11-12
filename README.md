@@ -28,6 +28,14 @@ and Yahoo doesn't allow browser calls. A scheduled job has none of those limits.
 | `tickers_extra.txt` | Your hand-picked extras, one per line. |
 | `test_scoring.py` | Offline checks of the rules: `python test_scoring.py`. |
 
+## Best opportunities today
+
+The page opens with up to five cards: the ADD-REVIEW stocks with the highest positive reward-per-time
+score (see the options study below), each with its company name, verdict (masters-confirmed cards
+have a green border), the chosen structure and expiry, cost, max loss, payoff if it gets back to the
+prior high, recovery odds in that time, typical recovery time from its past drops, and any risk flags.
+The same list is saved as `best_today` in `docs/results.json` and `docs/summary.json`.
+
 ## Past drops study
 
 For every stock on the ADD-REVIEW list or in the top 10, the job downloads its full daily price

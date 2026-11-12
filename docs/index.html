@@ -33,6 +33,16 @@ input[type=search]{width:100%;max-width:320px;padding:8px 10px;border:1px solid 
 .pass{color:var(--good)}.fail{color:var(--bad)}.na{color:var(--muted)}
 .banner{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);margin:12px 0}
 details{margin-top:28px}summary{cursor:pointer;font-weight:600}
+.best{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:10px 0 6px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.card.conf{border:2px solid var(--good)}
+.card .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card .tk{font-size:20px;font-weight:700}.card .rank{color:var(--muted);font-weight:600;margin-right:6px}
+.card .score{font-size:18px;font-weight:700;color:var(--accent);white-space:nowrap}
+.card .nm{color:var(--muted);font-size:13px;margin:0 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .st{font-weight:600;margin:8px 0 2px}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 0;font-size:14px}
+.card dt{color:var(--muted)}.card dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
 button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
 </style>
 </head>
@@ -41,6 +51,11 @@ button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--li
 <h1>Daily stock screen</h1>
 <div class="muted small" id="when">Loading results…</div>
 <div id="warn"></div>
+
+<h2 style="margin-top:18px">Best opportunities today</h2>
+<div class="muted small" id="best-rule">Ranked by expected return on the money at risk, per year in the market, from each stock's own past drops. ADD-REVIEW stocks only, best liquid structure each. Green border = masters-confirmed. A mechanical historical study, not advice.</div>
+<div class="best" id="best"></div>
+
 <div class="stats" id="stats"></div>
 
 <h2>Opportunities ranked by reward per time in the market</h2>
@@ -188,6 +203,30 @@ function oppTable(D){
   <table><thead><tr><th>Structure</th><th>Legs (bid/ask)</th><th>Expiry</th><th>Cost or credit</th><th>Max loss</th><th>Max gain</th><th>Breakeven</th><th>If back at high</th><th>At usual low</th><th>Score</th></tr></thead><tbody>${o.structures.map(x=>`<tr><td>${esc(x.structure)}${x.structure===o.best?' <span class="v v-conf">best</span>':""}${x.liquid?"":' <span class="flag">illiquid</span>'}</td><td style="white-space:normal">${legs(x)}</td><td>${esc(x.expiry||"–")}</td><td class="n">${x.cost_per_contract<0?usd(-x.cost_per_contract)+" credit":usd(x.cost_per_contract)}</td><td class="n">${usd(x.max_loss)}</td><td class="n">${x.max_gain==null?"unlimited":usd(x.max_gain)}</td><td class="n">${x.breakeven}</td><td class="n">${sgn(x.payoff_up)}</td><td class="n">${sgn(x.payoff_down)}</td><td class="n">${x.score==null?"–":(x.score*100).toFixed(0)+"%/yr"}</td></tr>`).join("")}</tbody></table>
   ${(o.notes||[]).map(n=>`<div class="small muted">${esc(n)}</div>`).join("")}<div class="small muted">Per contract (100 shares). Buys fill at the ask and sells at the bid. Max loss on a cash-secured put assumes the stock goes to zero.</div></td>`;tr.after(d)});
 }
+function bestList(D){
+ if(D.best_today)return D.best_today;
+ // Older results files: build the same list from the opportunities.
+ return(D.opportunities||[]).filter(o=>o.score!=null&&o.score>0&&(o.verdict||"").startsWith("ADD-REVIEW")).slice(0,5).map(o=>{const b=o.best_detail||{},d=(D.backtest||{})[o.ticker]||{};
+  return{ticker:o.ticker,name:(BY[o.ticker]||{}).name,verdict:o.verdict,flags:o.flags||[],score:o.score,structure:o.best,legs:b.legs||[],expiry:b.expiry,months:b.months,cost:b.cost_per_contract,max_loss:b.max_loss,payoff_up:b.payoff_up,p_recover:o.p_recover,past_drops:d.episodes,median_recovery_months:d.median_full_months,drop_now:d.drop_studied}});
+}
+function bestCards(D){
+ const el=$("#best"),list=bestList(D);
+ if(!list.length){el.innerHTML=`<div class="muted small">No ADD-REVIEW stock had a positive score today.</div>`;return}
+ const dt=s=>{if(!s)return null;const d=new Date(s+"T12:00:00");return d.toLocaleDateString([], {month:"short",day:"numeric",year:"numeric"})};
+ const mo=m=>m==null?"–":Math.round(m)+(Math.round(m)===1?" month":" months");
+ el.innerHTML=list.map((c,i)=>{
+  const conf=(c.verdict||"").includes("confirmed");
+  const legs=c.legs.length?c.legs.map(l=>`${l.side} ${l.strike} ${l.type}`).join(", "):"100 shares, no options";
+  const hold=c.expiry?`expires ${dt(c.expiry)} (${mo(c.months)})`:`hold about ${mo(c.months)}`;
+  const rec=c.median_recovery_months==null?"–":`${mo(c.median_recovery_months)}, median of ${c.past_drops} past drop${c.past_drops===1?"":"s"}`;
+  return`<div class="card${conf?" conf":""}"><div class="top"><div><span class="rank">#${i+1}</span><span class="tk">${esc(c.ticker)}</span></div><div class="score" title="Expected return on money at risk, per year">${Math.round(c.score*100)}%/yr</div></div>
+  <div class="nm">${esc(c.name||"")}</div>${vchip(c.verdict)}
+  <div class="st">${esc(c.structure||"–")}</div><div class="small muted">${esc(legs)}; ${esc(hold)}</div>
+  <dl><dt>Cost</dt><dd>${usd(c.cost)}</dd><dt>Max loss</dt><dd>${usd(c.max_loss)}</dd><dt>If back at the prior high</dt><dd>${sgn(c.payoff_up)}</dd>
+  <dt>Odds back at the high in that time</dt><dd>${c.p_recover==null?"–":Math.round(c.p_recover*100)+"%"}</dd>
+  <dt>Typical recovery</dt><dd>${esc(rec)}</dd><dt>Down from 52-week high</dt><dd>${c.drop_now==null?"–":c.drop_now+"%"}</dd></dl>
+  ${(c.flags||[]).length?`<div style="margin-top:8px">${flags(c)}</div>`:""}${c.past_drops!=null&&c.past_drops<3?`<div class="small muted" style="margin-top:6px">Only ${c.past_drops} past drop${c.past_drops===1?"":"s"} this size, so the odds are thin.</div>`:""}</div>`}).join("");
+}
 function render(D){
  DATA=D;BY={};D.rows.forEach(r=>BY[r.ticker]=r);
  const when=new Date(D.generated_at);
@@ -200,6 +239,7 @@ function render(D){
   .map(([k,v])=>`<div class="stat"><span class="muted small">${k}</span><b>${esc(v)}</b></div>`).join("");
  const pick=list=>list.map(t=>BY[t]).filter(Boolean);
  table($("#t-below"),pick(D.below_entry),["ticker","name","verdict","price","low","vs","ms","cons","flags","ins"]);
+ bestCards(D);
  oppTable(D);
  $("#boost").onchange=()=>oppTable(D);
  btTable(D);

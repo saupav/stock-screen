@@ -176,6 +176,29 @@ def universe_prices(tickers):
     return P, True
 
 
+BEST_N = 5
+
+
+def best_today(opportunities, rows_by, bt, n=BEST_N):
+    """The top n ADD-REVIEW stocks by the reward-per-time score, positive scores only."""
+    out = []
+    for o in opportunities:
+        if o.get("score") is None or o["score"] <= 0 or not (o.get("verdict") or "").startswith("ADD-REVIEW"):
+            continue
+        r, b, d = rows_by.get(o["ticker"], {}), o.get("best_detail") or {}, bt.get(o["ticker"]) or {}
+        out.append({
+            "ticker": o["ticker"], "name": r.get("name"), "verdict": o["verdict"], "flags": o.get("flags") or [],
+            "score": o["score"], "structure": o.get("best"), "legs": b.get("legs") or [],
+            "expiry": b.get("expiry"), "months": b.get("months"),
+            "cost": b.get("cost_per_contract"), "max_loss": b.get("max_loss"), "payoff_up": b.get("payoff_up"),
+            "p_recover": o.get("p_recover"), "past_drops": d.get("episodes"),
+            "median_recovery_months": d.get("median_full_months"), "drop_now": d.get("drop_studied"),
+        })
+        if len(out) == n:
+            break
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="only the first N tickers (testing)")
@@ -315,6 +338,7 @@ def main():
         "backtest": bt,
         "options": opt,
         "opportunities": opportunities,
+        "best_today": best_today(opportunities, {r["ticker"]: r for r in rows}, bt),
         "strategies": strat,
         "signals": signals,
         "attention": att,
@@ -338,6 +362,7 @@ def main():
                                    "max_loss": (o["best_detail"] or {}).get("max_loss"),
                                    "payoff_up": (o["best_detail"] or {}).get("payoff_up")}
                                 for o in opportunities[:10]]
+    summary["best_today"] = result["best_today"]
     (out.parent / "summary.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary, indent=1))
     if len(stocks) < 0.8 * len(universe):
