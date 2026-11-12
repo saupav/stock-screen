@@ -6,6 +6,15 @@ on:
     # GitHub can start scheduled runs late, so this leaves room before 8 AM.
     - cron: "15 12 * * 1-5"
   workflow_dispatch: {}
+  # Also run when the screen's code changes, so a fix shows up without waiting for the morning.
+  # The job's own results commits use the built-in token, which never starts another run.
+  push:
+    branches: [main]
+    paths:
+      - "*.py"
+      - "requirements.txt"
+      - "tickers_extra.txt"
+      - ".github/workflows/daily-screen.yml"
 
 permissions:
   contents: write
