@@ -88,7 +88,7 @@ def trends_changes(tickers):
         from trendspy import Trends
     except ImportError:
         return {}, "Google Trends skipped: trendspy is not installed."
-    tr, out, note = Trends(), {}, None
+    tr, out, note = Trends(request_delay=4.0), {}, None
     for i in range(0, len(tickers), 5):
         batch = tickers[i:i + 5]
         kws = [f"{t} stock" for t in batch]

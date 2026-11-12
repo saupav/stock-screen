@@ -49,7 +49,7 @@ jobs:
           # Optional. Leave unset and the Reddit columns are skipped.
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
-        run: python screen.py --workers 4
+        run: python screen.py --workers 2
 
       - name: Commit results
         run: |

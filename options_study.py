@@ -224,15 +224,24 @@ def _rows(df):
     return out
 
 
-def run(candidates, max_months_needed=None):
+START_PAUSE = 30   # let Yahoo's rate limit cool down after the main fetch
+GAP_SECONDS = 1.5  # between tickers
+
+
+def run(candidates, max_months_needed=None, retry=None):
     """candidates: {ticker: (spot, prior_high, bt)}. Needs network (Yahoo)."""
+    import time
     import yfinance as yf
+    retry = retry or (lambda fn: fn())
     today = dt.date.today()
     out = {}
+    if candidates:
+        time.sleep(START_PAUSE)
     for t, (spot, hi, bt) in candidates.items():
+        time.sleep(GAP_SECONDS)
         try:
             tk = yf.Ticker(t)
-            exps = list(tk.options or [])
+            exps = list(retry(lambda: tk.options) or [])
             if not exps:
                 out[t] = study(spot, hi, bt, {}, today)
                 continue
@@ -245,7 +254,7 @@ def run(candidates, max_months_needed=None):
                 pick.add(leaps[-1].isoformat())
             chains = {}
             for e in pick:
-                ch = tk.option_chain(e)
+                ch = retry(lambda: tk.option_chain(e))
                 chains[e] = {"calls": _rows(ch.calls), "puts": _rows(ch.puts)}
             out[t] = study(spot, hi, bt, chains, today)
         except Exception as e:

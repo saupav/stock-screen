@@ -71,15 +71,26 @@ def frame_to_dict(df):
     return {str(k): [num(v) for v in row] for k, row in df.iterrows()}
 
 
+def rate_limited(e):
+    return "RateLimit" in type(e).__name__ or "Too Many Requests" in str(e)
+
+
 def with_retry(fn, tries=4):
+    """Retry with backoff. Yahoo answers 429 when called too fast from shared cloud IPs,
+    so rate-limit errors wait much longer (20 s, 40 s, 80 s) than other errors."""
     for i in range(tries):
         try:
             return fn()
         except Exception as e:
             if i == tries - 1:
                 raise
-            time.sleep((2 ** i) * 3 + random.random() * 2)
+            base = 20 if rate_limited(e) else 3
+            time.sleep((2 ** i) * base + random.random() * 2)
             print(f"  retry after {type(e).__name__}: {e}", file=sys.stderr)
+
+
+PACE_SECONDS = 0.5   # pause after each ticker's fetch, per worker
+RETRY_PAUSE = 90     # wait before the second pass over failed tickers
 
 
 def statements(t, tk):
@@ -118,12 +129,14 @@ def fetch_one(t):
     info = with_retry(lambda: tk.info) or {}
     info = {k: info.get(k) for k in INFO_KEYS}
     st = statements(t, tk)
-    return t, {"info": info, **st}, insider_summary(tk)
+    ins = insider_summary(tk)
+    time.sleep(PACE_SECONDS)
+    return t, {"info": info, **st}, ins
 
 
 def treasury_10y():
     try:
-        h = yf.Ticker("^TNX").history(period="5d")
+        h = with_retry(lambda: yf.Ticker("^TNX").history(period="5d"))
         y = float(h["Close"].dropna().iloc[-1])
         return (y / 10 if y > 20 else y) / 100  # ^TNX quotes the yield in percent
     except Exception as e:
@@ -181,23 +194,44 @@ def main():
     print(f"Universe: {len(universe)} tickers")
 
     stocks, insider, failed = {}, {}, []
+
+    def take(t, fu):
+        try:
+            _, s, ins = fu.result() if hasattr(fu, "result") else fu
+            if s["info"].get("currentPrice") or s["info"].get("regularMarketPrice"):
+                stocks[t] = s
+                if ins:
+                    insider[t] = ins
+                return True
+        except Exception as e:
+            print(f"{t}: {e}", file=sys.stderr)
+        return False
+
     with ThreadPoolExecutor(max_workers=a.workers) as ex:
         futs = {ex.submit(fetch_one, t): t for t in universe}
         for i, fu in enumerate(as_completed(futs), 1):
             t = futs[fu]
-            try:
-                _, s, ins = fu.result()
-                if s["info"].get("currentPrice") or s["info"].get("regularMarketPrice"):
-                    stocks[t] = s
-                    if ins:
-                        insider[t] = ins
-                else:
-                    failed.append(t)
-            except Exception as e:
+            if not take(t, fu):
                 failed.append(t)
-                print(f"{t}: {e}", file=sys.stderr)
             if i % 50 == 0:
                 print(f"  {i}/{len(universe)}")
+
+    # Second pass, one at a time after a pause, for tickers Yahoo turned away.
+    if failed:
+        print(f"Retrying {len(failed)} failed tickers after {RETRY_PAUSE}s")
+        time.sleep(RETRY_PAUSE)
+        still = []
+        for t in failed:
+            try:
+                ok = take(t, fetch_one(t))
+            except Exception as e:
+                print(f"{t}: {e}", file=sys.stderr)
+                ok = False
+            if not ok:
+                still.append(t)
+            time.sleep(2)
+        failed = still
+        print(f"  {len(failed)} still failed")
 
     ty = treasury_10y()
     rows, pe_median = run_screens(stocks, ty, insider)
@@ -227,7 +261,7 @@ def main():
             if spot and hi:
                 cands[t] = (spot, hi, bt[t])
         print(f"Options study for {len(cands)} tickers")
-        opt = options_study.run(cands)
+        opt = options_study.run(cands, retry=with_retry)
         by = {r["ticker"]: r for r in rows}
         for t, o in opt.items():
             if not o:
