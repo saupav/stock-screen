@@ -63,10 +63,13 @@ back at the prior high, and at the usual low (prior high x (1 - median deepest f
 **Score** (expected return on money at risk, per year in the market):
 
 ```
-p      = share of past drops that got back to the prior high within the months to expiry
+p      = (k + 1) / (n + 2), where k of the n past drops got back to the prior high within the months held
 EV     = p x payoff(back at prior high) + (1 - p) x payoff(at usual low)
 score  = EV / max loss / years to expiry
 ```
+
+The `+1 / +2` (Laplace's rule) keeps one or two past drops from reading as certain recovery:
+1 of 1 counts as 67%, 9 of 10 as 83%. The odds shown are for the best structure's own holding time.
 
 The best structure for a stock is the one with the highest score among those whose legs are all
 liquid (live bid and ask, spread no more than 25% of mid, open interest 100+). The shares baseline

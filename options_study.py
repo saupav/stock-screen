@@ -60,11 +60,15 @@ def target_months(bt):
 
 
 def p_recover(bt, months):
+    """Share of past drops back at the prior high within `months`, smoothed as (k + 1) / (n + 2)
+    (Laplace's rule), so one or two lucky past drops don't read as certainty.
+    ASSUMPTION: the smoothing is not in the written rules."""
     full = [x for x in (bt.get("full_months_all") or []) if x is not None]
     n = bt.get("episodes") or 0
     if n == 0:
         return None
-    return sum(1 for x in full if x <= months) / n
+    k = sum(1 for x in full if x <= months)
+    return (k + 1) / (n + 2)
 
 
 def months_between(today, expiry):
@@ -129,6 +133,7 @@ def build(kind, name, legs, net, spot, up, down, p, months, expiry):
     r2 = lambda x: None if x is None else round(x, 2)
     return {
         "structure": name, "kind": kind, "expiry": expiry, "months": round(months, 1),
+        "p": None if p is None else round(p, 3),
         "legs": [{"side": l.get("side"), "type": l.get("type"), "strike": l["strike"], "bid": l["bid"],
                   "ask": l["ask"], "oi": l["oi"], "spread_pct": l["spread_pct"], "live": l["live"]} for l in legs],
         "net_per_share": r2(net), "cost_per_contract": r2(net * CONTRACT),

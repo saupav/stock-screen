@@ -270,7 +270,8 @@ def main():
             opportunities.append({"ticker": t, "verdict": by[t]["verdict"], "value_score": by[t]["value_score"],
                                   "masters_score": by[t]["masters_score"], "flags": by[t]["flags"],
                                   "score": o["score"], "best": o["best"], "best_detail": best,
-                                  "p_recover": o.get("p_recover"), "expiry": o.get("expiry")})
+                                  "p_recover": (best or {}).get("p", o.get("p_recover")),
+                                  "expiry": (best or {}).get("expiry") if best else o.get("expiry")})
         opportunities.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
 
     # Side-by-side strategy backtests (recomputed when the weekly price cache refreshes).
