@@ -1,0 +1,2 @@
+# Your hand-picked extras, one ticker per line (Yahoo symbols, e.g. BRK-B).
+# The S&P 500 list is fetched automatically each run.

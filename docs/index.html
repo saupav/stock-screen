@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily Stock Screen</title>
+<style>
+:root{--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dc;--accent:#2f5d8a;--good:#1f7a4a;--warn:#a5620a;--bad:#b23a3a;--chip:#eef2f6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141413;--panel:#1d1d1b;--text:#ecebe6;--muted:#9b9a93;--line:#33322e;--accent:#7fb0e0;--good:#5cc28d;--warn:#e0a24a;--bad:#e57373;--chip:#262a30;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141413;--panel:#1d1d1b;--text:#ecebe6;--muted:#9b9a93;--line:#33322e;--accent:#7fb0e0;--good:#5cc28d;--warn:#e0a24a;--bad:#e57373;--chip:#262a30;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:28px 0 8px}
+.muted{color:var(--muted)}.small{font-size:13px}
+.stats{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:120px}
+.stat b{display:block;font-size:20px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-weight:600;color:var(--muted);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--panel)}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--chip)}
+.v{font-weight:600;padding:2px 7px;border-radius:6px;font-size:12px}
+.v-ok{color:var(--accent);background:var(--chip)}.v-conf{color:var(--good);background:var(--chip)}.v-flag{color:var(--warn);background:var(--chip)}
+.flag{color:var(--bad);font-size:12px}
+.chip{display:inline-block;background:var(--chip);border-radius:5px;padding:1px 6px;margin:1px;font-size:12px}
+input[type=search]{width:100%;max-width:320px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font:inherit;margin-bottom:8px}
+.detail td{white-space:normal;background:var(--bg)}
+.detail ul{margin:4px 0 8px;padding-left:18px;columns:2;column-gap:28px}
+@media (max-width:640px){.detail ul{columns:1}}
+.pass{color:var(--good)}.fail{color:var(--bad)}.na{color:var(--muted)}
+.banner{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);margin:12px 0}
+details{margin-top:28px}summary{cursor:pointer;font-weight:600}
+button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+<h1>Daily stock screen</h1>
+<div class="muted small" id="when">Loading results…</div>
+<div id="warn"></div>
+<div class="stats" id="stats"></div>
+
+<h2>Opportunities ranked by reward per time in the market</h2>
+<div class="muted small">Each flagged stock's best structure by one rule: expected return on money at risk, per year, using its own past drops. Score = [p × payoff if back at the prior high + (1 − p) × payoff at the usual deepest fall] ÷ max loss ÷ years to expiry, where p is the share of past drops that got back to the prior high in that time. Only structures whose legs are all liquid can win. Click a row to compare every structure. A mechanical historical study, not advice.</div>
+<label class="small" style="display:inline-flex;gap:6px;align-items:center;margin:6px 0"><input type="checkbox" id="boost"> Boost the ranking by rising attention (score × the attention multiplier)</label>
+<div id="att-notes" class="small muted"></div>
+<div class="panel"><table id="t-opp"></table></div>
+
+<h2>ADD-REVIEW: at or below the lowest analyst target</h2>
+<div class="muted small">Passed the quality gate and trades at or below its lowest analyst target. Masters-confirmed means 4+ consensus lenses and no risk flags.</div>
+<div class="panel"><table id="t-below"></table></div>
+
+<h2>Past drops like today's</h2>
+<div class="muted small">For each flagged stock: earlier times it fell at least as far below its 52-week high as it is today (10% minimum), and how long it took to get back. "Half" means back within half of that drop; "full" means back at the prior high. Click a row for every episode. History, not a forecast; today's S&amp;P members only, so companies that never recovered and left the index aren't in it.</div>
+<div class="panel"><table id="t-bt"></table></div>
+
+<h2>Strategies compared</h2>
+<div class="muted small"><span id="strat-meta"></span> Each strategy backtested on daily prices of today's universe, 0.2% cost per stock trade. The option-writing rows use modelled prices (Black-Scholes on recent realized volatility), because free option history doesn't exist. Only today's index members are tested, which flatters every row. Post-earnings drift isn't here: it needs years of dated earnings surprises, which free data lacks.</div>
+<div class="panel"><table id="t-strat"></table></div>
+
+<h2>Undervalued screen: top 10</h2>
+<div class="panel"><table id="t-top"></table></div>
+
+<h2>Masters screen: top 20</h2>
+<div class="panel"><table id="t-masters"></table></div>
+
+<h2>All stocks</h2>
+<input type="search" id="q" placeholder="Filter by ticker, name or sector">
+<div class="panel"><table id="t-all"></table></div>
+
+<details>
+<summary>How the scores work, and what is approximated</summary>
+<div class="small">
+<p><b>Screen 1.</b> Quality gate: ROE ≥ 12%, operating margin ≥ 10%, debt-to-equity ≤ 200%. Missing gate data fails the gate. Value score: FCF yield (25), PEG (20), forward earnings yield (15), discount from 52-week high (20), upside to mean target (10), price vs lowest target (10), each a straight-line ramp between its zero and full points; missing factors are left out and the rest rescaled. Bonus up to 5 for ROE above 15% (full at 30%) and up to 5 for operating margin above 20% (full at 40%); capped at 100.</p>
+<p><b>Screen 2.</b> Each checklist lens scores the share of its checks passed; checks that can't be computed are skipped. Greenblatt is the Magic Formula percentile (banks, insurers and other financials, and utilities excluded). Piotroski is F-score ÷ 9. Margin of safety: 10-year DCF on 3-year average FCF, growth = lower of sales growth, EPS growth or 12%, fading to 3%, 10% discount rate, 2.5% terminal growth, plus cash minus debt; financials use justified P/B. 50%+ discount scores 100. MASTERS score = weighted average with each lens pulled 15% toward 50. Consensus = lenses scoring 70+.</p>
+<p><b>Data.</b> Yahoo Finance via yfinance, 4 annual reports per company, so "every year" means the last four. Approximations and choices the written rules leave open are marked ASSUMPTION in scoring.py.</p>
+<p><b>Past drops.</b> For each stock on the ADD-REVIEW list or in the top 10: its own daily adjusted price history (as far back as Yahoo has it), every earlier time it fell at least as far below its trailing 52-week high as today (10% minimum). Each episode ends when the price is back at that prior high; the next can only start after. The drop the stock is in now is left out. Months are trading months (21 trading days). Only today's index members are studied, which flatters the recovery figures.</p>
+<p><b>Options study.</b> Target time = 75th percentile of the stock's past recovery times (1.5 × the median with fewer than 4 past drops, 12 months with none). The expiry is the first listed on or after it. Structures: 100 shares (baseline), long call at the first strike at or above the price, bull call spread selling the strike nearest the prior high, cash-secured put near 95% of the price, and a deep in-the-money LEAPS call (longest expiry 9+ months, strike near 80%). Liquid means a live bid and ask, a spread of 25% of mid or less, and open interest of 100+. The job runs before the market opens, so quotes are the prior session's; recovery odds count from the start of each past drop, not from today; and only today's S&amp;P members are studied, which flatters the odds.</p>
+<p><b>Attention.</b> Reddit: posts in r/wallstreetbets, r/stocks and r/investing naming "$TICKER" or the company, last 7 days vs the weekly average of the 21 days before (needs a Reddit API key set as a repository secret). Google: search interest in "TICKER stock" in the US, last 4 weeks vs the 8 before, through an unofficial route that Google often blocks. Change = the average of the two ratios. The optional boost multiplies a score by 1 + 0.25 × log2(change), limited to between 0.75 and 1.25.</p>
+<p><b>Signals today.</b> Whether the stock is in the top 10% by 12-1 momentum or by closeness to its 52-week high, and whether the RSI-2 reversal rule would buy it today.</p>
+<p>Mechanical rules for research, not advice.</p>
+</div>
+</details>
+<p class="small muted" style="margin-top:20px">No results file next to this page? <button id="pick">Open a results.json</button><input type="file" id="file" accept=".json" hidden></p>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const f1=v=>v==null?"–":(+v).toFixed(1);
+const f2=v=>v==null?"–":(+v).toFixed(2);
+const pct=v=>v==null?"–":(+v).toFixed(1)+"%";
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let DATA=null,BY={};
+function vchip(v){if(!v)return"";const c=v.includes("confirmed")?"v-conf":v.includes("flagged")?"v-flag":"v-ok";return`<span class="v ${c}">${esc(v)}</span>`}
+function flags(r){return(r.flags||[]).map(f=>`<span class="flag">⚠ ${esc(f)}</span>`).join(" ")}
+const COLS={
+ ticker:["Ticker",r=>`<b>${esc(r.ticker)}</b>`,r=>r.ticker],
+ name:["Name",r=>esc((r.name||"").slice(0,28)),r=>r.name],
+ price:["Price",r=>f2(r.price),r=>r.price,1],
+ low:["Low target",r=>f2(r.target_low),r=>r.target_low,1],
+ mean:["Mean target",r=>f2(r.target_mean),r=>r.target_mean,1],
+ vs:["Value",r=>f1(r.value_score),r=>r.value_score,1],
+ ms:["Masters",r=>f1(r.masters_score),r=>r.masters_score,1],
+ cons:["Consensus",r=>(r.consensus||[]).map(c=>`<span class="chip">${esc(c)}</span>`).join(""),r=>(r.consensus||[]).length],
+ verdict:["Verdict",r=>vchip(r.verdict),r=>r.verdict],
+ flags:["Risk flags",flags,r=>(r.flags||[]).length],
+ fcf:["FCF yld",r=>pct(r.value_inputs?.fcf_yield),r=>r.value_inputs?.fcf_yield,1],
+ peg:["PEG",r=>f2(r.value_inputs?.peg),r=>r.value_inputs?.peg,1],
+ off:["Off high",r=>pct(r.value_inputs?.off_high),r=>r.value_inputs?.off_high,1],
+ gate:["Gate",r=>r.gate?'<span class="pass">pass</span>':`<span class="fail">${esc((r.gate_fail||[]).join(", "))}</span>`,r=>r.gate?1:0],
+ sector:["Sector",r=>esc(r.sector),r=>r.sector],
+ ins:["Insider buying",r=>r.insider?.net_shares_6m>0?`net +${Math.round(r.insider.net_shares_6m).toLocaleString()} sh (6m)`:"",r=>r.insider?.net_shares_6m||0],
+};
+function table(el,rows,cols){
+ let sortK=null,dir=-1;
+ const draw=()=>{
+  let rs=rows.slice();
+  if(sortK){const g=COLS[sortK][2];rs.sort((a,b)=>{const x=g(a),y=g(b);if(x==null)return 1;if(y==null)return -1;return(x>y?1:x<y?-1:0)*dir})}
+  const n=cols.length;
+  el.innerHTML=`<thead><tr>${cols.map(k=>`<th data-k="${k}">${COLS[k][0]}${sortK===k?(dir>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead><tbody>`+
+   (rs.length?rs.map(r=>`<tr class="row" data-t="${esc(r.ticker)}">${cols.map(k=>`<td class="${COLS[k][3]?"n":""}">${COLS[k][1](r)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${n}" class="muted">None today.</td></tr>`)+"</tbody>";
+  el.querySelectorAll("th").forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortK===k)dir=-dir;else{sortK=k;dir=COLS[k][3]?-1:1}draw()});
+  el.querySelectorAll("tr.row").forEach(tr=>tr.onclick=()=>toggle(tr,n));
+ };
+ draw();
+}
+function toggle(tr,n){
+ const nx=tr.nextElementSibling;if(nx&&nx.classList.contains("detail")){nx.remove();return}
+ const r=BY[tr.dataset.t];if(!r)return;
+ const vi=r.value_inputs||{},vp=r.value_points||{};
+ const lens=Object.entries(r.lenses||{}).map(([k,v])=>`<span class="chip">${k} ${f1(v)}</span>`).join("");
+ const checks=Object.entries(r.checks||{}).map(([k,cs])=>cs.length?`<div><b>${k}</b><ul>${cs.map(([nm,v])=>`<li class="${v===true?"pass":v===false?"fail":"na"}">${v===true?"✓":v===false?"✗":typeof v==="number"?"":"–"} ${esc(nm)}${typeof v==="number"?": "+v:""}</li>`).join("")}</ul></div>`:"").join("");
+ const d=document.createElement("tr");d.className="detail";
+ d.innerHTML=`<td colspan="${n}"><div><b>${esc(r.ticker)}</b> ${esc(r.name)} · ${esc(r.sector)} ${r.piotroski!=null?"· Piotroski "+r.piotroski:""}</div>
+ <div class="small" style="margin:6px 0">Value inputs: FCF yield ${pct(vi.fcf_yield)}, PEG ${f2(vi.peg)}, fwd earnings yield ${pct(vi.fwd_earn_yield)}, off 52-wk high ${pct(vi.off_high)}, upside to mean ${pct(vi.upside_mean)}, vs low target ${pct(vi.vs_low_target)}${Object.keys(vp).length?" · points "+Object.entries(vp).map(([k,v])=>k+" "+v).join(", "):""}</div>
+ <div style="margin:6px 0">${lens}</div>${flags(r)}<div class="small" style="margin-top:6px">${checks}</div></td>`;
+ tr.after(d);
+}
+const mo=v=>v==null?"–":(v<1?"<1":Math.round(v))+" mo";
+function btTable(D){
+ const el=$("#t-bt"),bt=D.backtest||{};
+ const ts=[...new Set([...(D.below_entry||[]),...(D.top10||[])])].filter(t=>bt[t]);
+ const H=["Ticker","Off high today","Past drops","Per decade","Median to half","Median to full","Longest","Back in 12 mo","12-mo return after","In this drop since"];
+ if(!ts.length){el.innerHTML=`<tbody><tr><td class="muted">${D.backtest?"No flagged stock had enough history.":"Not run in this results file."}</td></tr></tbody>`;return}
+ el.innerHTML=`<thead><tr>${H.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>`+ts.map(t=>{const b=bt[t],r=BY[t]||{};
+  return`<tr class="row" data-bt="${esc(t)}"><td><b>${esc(t)}</b></td><td class="n">${pct(r.value_inputs?.off_high)}</td><td class="n">${b.episodes} <span class="muted small">≥${b.drop_studied}% since ${esc(b.first_date.slice(0,4))}</span></td><td class="n">${f1(b.per_decade)}</td><td class="n">${mo(b.median_half_months)}</td><td class="n">${mo(b.median_full_months)}</td><td class="n">${mo(b.longest_full_months)}</td><td class="n">${b.pct_full_within_12m==null?"–":b.pct_full_within_12m+"%"}</td><td class="n">${b.median_fwd_12m==null?"–":(b.median_fwd_12m>0?"+":"")+b.median_fwd_12m+"%"}${b.pct_fwd_12m_positive==null?"":` <span class="muted small">(${b.pct_fwd_12m_positive}% up)</span>`}</td><td>${esc(b.current_since||"")}</td></tr>`}).join("")+"</tbody>";
+ el.querySelectorAll("tr.row").forEach(tr=>tr.onclick=()=>{const nx=tr.nextElementSibling;if(nx&&nx.classList.contains("detail")){nx.remove();return}
+  const b=bt[tr.dataset.bt];const d=document.createElement("tr");d.className="detail";
+  d.innerHTML=`<td colspan="${H.length}">${b.list.length?`<table><thead><tr><th>Drop reached</th><th>Deepest</th><th>To half</th><th>To full</th><th>12 mo later</th></tr></thead><tbody>${b.list.slice().reverse().map(e=>`<tr><td>${esc(e.start)}</td><td class="n">${e.depth}%</td><td class="n">${mo(e.half_months)}</td><td class="n">${mo(e.full_months)}</td><td class="n">${e.fwd_12m==null?"–":(e.fwd_12m>0?"+":"")+e.fwd_12m+"%"}</td></tr>`).join("")}</tbody></table>`:"No earlier drop this large."}
+  <div class="small muted" style="margin-top:6px">Median deepest fall ${b.median_depth??"–"}%, worst ${b.max_depth??"–"}%${b.worst?` (from ${esc(b.worst.start)}, ${mo(b.worst.full_months)} to recover)`:""}.</div></td>`;tr.after(d)});
+}
+const usd=v=>v==null?"–":(v<0?"−$":"$")+Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0});
+const sgn=v=>v==null?"–":(v>0?"+":"")+usd(v);
+function attCell(a){if(!a)return"–";const parts=[];
+ if(a.reddit)parts.push(`Reddit ${a.reddit.mentions_7d}/wk`);
+ if(a.trends)parts.push(`Search ${a.trends.change==null?"–":a.trends.change+"×"}`);
+ const c=a.change==null?"":` <b class="${a.change>1.2?"pass":a.change<0.8?"fail":""}">${a.change}×</b>`;
+ return`<span class="small">${parts.join(", ")}</span>${c}`}
+function sigChips(sg){if(!sg)return"";const c=[];
+ if(sg.momentum_pct_rank>=90)c.push("Momentum top 10%");
+ if(sg.high52_pct_rank>=90)c.push("Near high top 10%");
+ if(sg.rsi2_buy)c.push("RSI-2 buy");
+ return c.map(x=>`<span class="chip">${x}</span>`).join("")||`<span class="muted small">none</span>`}
+function stratTable(D){
+ const el=$("#t-strat"),st=D.strategies;
+ if(!st||!st.strategies){el.innerHTML=`<tbody><tr><td class="muted">Not run in this results file.</td></tr></tbody>`;return}
+ $("#strat-meta").textContent=`${st.stocks} stocks, ${st.from} to ${st.to}. Recomputed weekly.`;
+ const H=["Strategy","Rule","Trades","Hit rate","Median trade","Bad trade (10th pct)","Median days held","Yearly return","Max drawdown","Sharpe","Time invested"];
+ const p=v=>v==null?"–":v+"%";
+ el.innerHTML=`<thead><tr>${H.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>`+st.strategies.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td class="small" style="white-space:normal;min-width:220px">${esc(r.rule)}</td><td class="n">${r.trades?.toLocaleString()??"–"}</td><td class="n">${p(r.hit_rate)}</td><td class="n">${p(r.median_trade)}</td><td class="n">${p(r.bad_trade_p10)}</td><td class="n">${r.median_days??"–"}</td><td class="n">${p(r.cagr)}</td><td class="n">${p(r.max_drawdown)}</td><td class="n">${r.sharpe??"–"}</td><td class="n">${p(r.time_invested_pct)}</td></tr>`).join("")+"</tbody>";
+}
+function oppTable(D){
+ const el=$("#t-opp");
+ const H=["#","Ticker","Verdict","Score","Best structure","Expiry","Cost","Max loss","If back at high","Back in time (history)","Widest bid/ask","Attention","Signals today"];
+ const boostOn=$("#boost").checked;
+ const eff=o=>o.score==null?null:o.score*(boostOn?(o.attention_boost||1):1);
+ const ops=(D.opportunities||[]).slice().sort((a,b)=>(eff(a)==null)-(eff(b)==null)||(eff(b)||0)-(eff(a)||0));
+ $("#att-notes").textContent=(D.attention_notes||[]).join(" ");
+ if(!ops.length){el.innerHTML=`<tbody><tr><td class="muted">${D.opportunities?"No flagged stock had an options study today.":"Not run in this results file."}</td></tr></tbody>`;return}
+ el.innerHTML=`<thead><tr>${H.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>`+ops.map((o,i)=>{const b=o.best_detail||{};
+  return`<tr class="row" data-op="${esc(o.ticker)}"><td class="n">${i+1}</td><td><b>${esc(o.ticker)}</b></td><td>${vchip(o.verdict)}</td><td class="n">${eff(o)==null?"–":(eff(o)*100).toFixed(0)+"%/yr"}</td><td>${esc(o.best||"–")}</td><td>${esc(b.expiry||"–")}${b.months!=null?` <span class="muted small">${Math.round(b.months)} mo</span>`:""}</td><td class="n">${usd(b.cost_per_contract)}</td><td class="n">${usd(b.max_loss)}</td><td class="n">${sgn(b.payoff_up)}</td><td class="n">${o.p_recover==null?"–":Math.round(o.p_recover*100)+"%"}</td><td class="n">${b.widest_spread_pct==null?"–":b.widest_spread_pct+"%"}</td><td class="n">${attCell(o.attention)}</td><td>${sigChips(o.signals)}</td></tr>`}).join("")+"</tbody>";
+ el.querySelectorAll("tr.row").forEach(tr=>tr.onclick=()=>{const nx=tr.nextElementSibling;if(nx&&nx.classList.contains("detail")){nx.remove();return}
+  const o=(D.options||{})[tr.dataset.op];if(!o)return;const d=document.createElement("tr");d.className="detail";
+  const legs=x=>x.legs.length?x.legs.map(l=>`${l.side} ${l.strike} ${l.type} <span class="muted">${l.bid}/${l.ask}${l.spread_pct!=null?" ("+l.spread_pct+"%)":""}, OI ${l.oi}${l.live?"":", last trade"}</span>`).join("<br>"):"100 shares";
+  d.innerHTML=`<td colspan="${H.length}"><div class="small" style="margin-bottom:6px">Target ${o.target_months} months from past recoveries · up case $${o.up_price} (prior high) · down case $${o.down_price} (usual deepest fall)</div>
+  <table><thead><tr><th>Structure</th><th>Legs (bid/ask)</th><th>Expiry</th><th>Cost or credit</th><th>Max loss</th><th>Max gain</th><th>Breakeven</th><th>If back at high</th><th>At usual low</th><th>Score</th></tr></thead><tbody>${o.structures.map(x=>`<tr><td>${esc(x.structure)}${x.structure===o.best?' <span class="v v-conf">best</span>':""}${x.liquid?"":' <span class="flag">illiquid</span>'}</td><td style="white-space:normal">${legs(x)}</td><td>${esc(x.expiry||"–")}</td><td class="n">${x.cost_per_contract<0?usd(-x.cost_per_contract)+" credit":usd(x.cost_per_contract)}</td><td class="n">${usd(x.max_loss)}</td><td class="n">${x.max_gain==null?"unlimited":usd(x.max_gain)}</td><td class="n">${x.breakeven}</td><td class="n">${sgn(x.payoff_up)}</td><td class="n">${sgn(x.payoff_down)}</td><td class="n">${x.score==null?"–":(x.score*100).toFixed(0)+"%/yr"}</td></tr>`).join("")}</tbody></table>
+  ${(o.notes||[]).map(n=>`<div class="small muted">${esc(n)}</div>`).join("")}<div class="small muted">Per contract (100 shares). Buys fill at the ask and sells at the bid. Max loss on a cash-secured put assumes the stock goes to zero.</div></td>`;tr.after(d)});
+}
+function render(D){
+ DATA=D;BY={};D.rows.forEach(r=>BY[r.ticker]=r);
+ const when=new Date(D.generated_at);
+ $("#when").textContent=`Run ${when.toLocaleString([], {dateStyle:"medium",timeStyle:"short"})} · 10-yr Treasury ${(D.treasury_10y*100).toFixed(2)}% · universe P/E median ${f1(D.pe_median)}`;
+ const age=(Date.now()-when)/36e5;
+ $("#warn").innerHTML=(age>30?`<div class="banner">These results are ${Math.round(age)} hours old; today's run may not have finished.</div>`:"")+
+  (D.scored<D.universe*0.8?`<div class="banner">Only ${D.scored} of ${D.universe} tickers loaded today, so lists may be incomplete.</div>`:"");
+ const confirmed=D.masters_confirmed.length?D.masters_confirmed.join(", "):"none";
+ $("#stats").innerHTML=[["Universe",D.universe],["Scored",D.scored],["Passed gate",D.gate_passed],["Below entry",D.below_entry_count],["Masters-confirmed",confirmed]]
+  .map(([k,v])=>`<div class="stat"><span class="muted small">${k}</span><b>${esc(v)}</b></div>`).join("");
+ const pick=list=>list.map(t=>BY[t]).filter(Boolean);
+ table($("#t-below"),pick(D.below_entry),["ticker","name","verdict","price","low","vs","ms","cons","flags","ins"]);
+ oppTable(D);
+ $("#boost").onchange=()=>oppTable(D);
+ btTable(D);
+ stratTable(D);
+ table($("#t-top"),pick(D.top10),["ticker","name","vs","fcf","peg","off","price","low","mean","verdict"]);
+ table($("#t-masters"),pick(D.masters_top),["ticker","name","ms","cons","flags","vs","gate"]);
+ const all=()=>{const q=$("#q").value.trim().toLowerCase();table($("#t-all"),D.rows.filter(r=>!q||(r.ticker+" "+r.name+" "+r.sector).toLowerCase().includes(q)),["ticker","name","sector","gate","vs","ms","cons","flags","verdict"])};
+ $("#q").oninput=all;all();
+}
+fetch("results.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(render).catch(()=>{$("#when").textContent="No results.json found next to this page. Open one below, or wait for the first scheduled run."});
+$("#pick").onclick=()=>$("#file").click();
+$("#file").onchange=e=>{const f=e.target.files[0];if(f)f.text().then(t=>render(JSON.parse(t)))};
+</script>
+</body>
+</html>
