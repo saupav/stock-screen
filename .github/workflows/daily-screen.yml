@@ -5,6 +5,9 @@ on:
     # 12:15 UTC = 6:15 AM Chicago in winter (CST), 7:15 AM in summer (CDT).
     # GitHub can start scheduled runs late, so this leaves room before 8 AM.
     - cron: "15 12 * * 1-5"
+    # 15:00 UTC = 9:00 AM Chicago in winter, 10:00 AM in summer: after the open, buy the
+    # morning's pretend-portfolio picks at the opening price and live option quotes.
+    - cron: "0 15 * * 1-5"
   workflow_dispatch: {}
   # Also run when the screen's code changes, so a fix shows up without waiting for the morning.
   # The job's own results commits use the built-in token, which never starts another run.
@@ -49,7 +52,16 @@ jobs:
           # Optional. Leave unset and the Reddit columns are skipped.
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
-        run: python screen.py --workers 2
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$EVENT_SCHEDULE" = "0 15 * * 1-5" ]; then
+            python screen.py --fill-only
+          elif [ "$EVENT_NAME" = "schedule" ]; then
+            python screen.py --workers 2 --paper-buy
+          else
+            python screen.py --workers 2
+          fi
 
       - name: Commit results
         run: |

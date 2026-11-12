@@ -25,7 +25,7 @@ and Yahoo doesn't allow browser calls. A scheduled job has none of those limits.
 | `paper.py` | The hypothetical $1,000-a-pick portfolio, kept in `docs/paper.json`. |
 | `screen.py` | Fetches the data and writes `docs/results.json` and `docs/summary.json`. |
 | `docs/index.html` | The results page. |
-| `.github/workflows/daily-screen.yml` | Runs at 12:15 UTC Monday to Friday (6:15 AM Chicago in winter, 7:15 AM in summer), and on demand. |
+| `.github/workflows/daily-screen.yml` | Runs the screens at 12:15 UTC Monday to Friday (6:15 AM Chicago in winter, 7:15 AM in summer), buys the pretend portfolio's picks at 15:00 UTC, and runs on demand. |
 | `tickers_extra.txt` | Your hand-picked extras, one per line. |
 | `test_scoring.py` | Offline checks of the rules: `python test_scoring.py`. |
 
@@ -40,9 +40,12 @@ The same list is saved as `best_today` in `docs/results.json` and `docs/summary.
 ## Hypothetical portfolio
 
 Pretend money, bookkeeping only: no real money, no broker and no orders, simulated or otherwise.
-Each weekday the job records $1,000 into each of that day's best five (`STAKE` in `paper.py`), in
-the structure its card shows, at the mid of each option leg's bid and ask (shares at the run's
-price). $1,000 is the most each position can lose: shares buy $1,000 of stock; a debit structure buys
+Each weekday the 6:15 AM Chicago run picks that day's best five, and a second run just after the
+market opens (15:00 UTC: 9:00 AM Chicago in winter, 10:00 AM in summer) buys $1,000 of each
+(`STAKE` in `paper.py`) in the structure its card shows: shares at that day's opening price, options
+at the mid of each leg's live bid and ask. A pick without live quotes waits for the next after-open
+run; after 3 tries it's marked not bought and never counts. Runs started by a code change don't
+pick or buy anything. $1,000 is the most each position can lose: shares buy $1,000 of stock; a debit structure buys
 $1,000 ÷ (debit × 100) contracts; a cash-secured put sells $1,000 ÷ ((strike − credit) × 100).
 A position closes when the stock gets back to its prior 52-week high, when its options expire (at
 intrinsic value), or for shares after the card's holding time. Until then each run values it from
@@ -54,7 +57,8 @@ day bought, stock, strategy, profit $, profit % and profit per year in the marke
 open/closed filter and totals by strategy, stock or day. `docs/summary.json` carries
 `paper_total_invested`, `paper_value` and `paper_pl_pct`.
 
-The job runs before the market opens, so entries use the prior session's quotes.
+The first five (Nov 12, 2026) were bought at 12:57 PM Chicago on live midday quotes, before this
+morning/after-open schedule existed.
 
 ## Past drops study
 

@@ -65,10 +65,10 @@ button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--li
 <div class="best" id="best"></div>
 
 <h2>Hypothetical portfolio: $1,000 into each of the top five, every weekday</h2>
-<div class="banner small"><b>Pretend money, bookkeeping only.</b> No real money, no broker and no orders, simulated or otherwise. Each weekday the job records $1,000 into each of that day's five cards, in the structure the card shows, at the mid of each option's bid and ask (shares at the run's price). $1,000 is the most each can lose. A position closes when the stock gets back to its prior high, when its options expire, or for shares after the card's holding time; until then it's valued every run from fresh quotes. A mechanical study, not advice.</div>
+<div class="banner small"><b>Pretend money, bookkeeping only.</b> No real money, no broker and no orders, simulated or otherwise. Each weekday the 6:15 AM Chicago run picks that day's five cards, and a run just after the market opens buys $1,000 of each in the structure the card shows: shares at the day's opening price, options at the mid of each leg's live bid and ask. $1,000 is the most each can lose. A position closes when the stock gets back to its prior high, when its options expire, or for shares after the card's holding time; until then it's valued every run from fresh quotes. A mechanical study, not advice.</div>
 <div class="stats" id="pp-stats"></div>
 <div class="panel" id="pp-chart"></div>
-<div class="pp-ctl small"><label>Show <select id="pp-show"><option value="all">All positions</option><option value="open">Open</option><option value="closed">Closed</option></select></label>
+<div class="pp-ctl small"><label>Show <select id="pp-show"><option value="all">All positions</option><option value="open">Open</option><option value="closed">Closed</option><option value="pending">Waiting to buy</option></select></label>
 <label>Group by <select id="pp-group"><option value="pos">Each position</option><option value="structure">Strategy</option><option value="ticker">Stock</option><option value="opened">Day bought</option></select></label>
 <span class="muted">Click a column to sort.</span></div>
 <div class="panel"><table id="t-pp"></table></div>
@@ -289,10 +289,12 @@ function ppChart(H){
 function paperSection(D){
  const S=D.paper;
  if(!S||!S.positions){$("#pp-stats").innerHTML="";$("#pp-chart").innerHTML=`<div class="muted small">Not run in this results file.</div>`;$("#t-pp").innerHTML="";return}
- const P=S.positions.map(p=>({...p,pl:p.value-p.invested,plp:(p.value/p.invested-1)*100,py:(p.value-p.invested)/p.invested*100/yrs(p),days:Math.round(yrs(p)*365)}));
+ const bought=p=>p.status==="open"||p.status==="closed";
+ const P=S.positions.map(p=>bought(p)?({...p,pl:p.value-p.invested,plp:(p.value/p.invested-1)*100,py:(p.value-p.invested)/p.invested*100/yrs(p),days:Math.round(yrs(p)*365)}):({...p,pl:null,plp:null,py:null,days:null}));
+ const pend=P.filter(p=>p.status==="pending").length;
  const inv=P.reduce((a,p)=>a+p.invested,0),val=P.reduce((a,p)=>a+p.value,0);
- const days=new Set(P.map(p=>p.opened)).size;
- $("#pp-stats").innerHTML=[["Put in",usd(inv)],["Worth now",usd(Math.round(val))],["Profit or loss",pld(val-inv)+" "+plc(inv?(val/inv-1)*100:null)],["Positions",`${P.filter(p=>p.status==="open").length} open, ${P.filter(p=>p.status==="closed").length} closed`],["Days bought",days+(S.started?` <span class="muted small">since ${esc(S.started)}</span>`:"")]]
+ const days=new Set(P.filter(bought).map(p=>p.opened)).size;
+ $("#pp-stats").innerHTML=[["Put in",usd(inv)],["Worth now",usd(Math.round(val))],["Profit or loss",pld(val-inv)+" "+plc(inv?(val/inv-1)*100:null)],["Positions",`${P.filter(p=>p.status==="open").length} open, ${P.filter(p=>p.status==="closed").length} closed`],["Waiting to buy",pend?`${pend} <span class="muted small">at the open</span>`:"none"],["Days bought",days+(S.started?` <span class="muted small">since ${esc(S.started)}</span>`:"")]]
   .map(([k,v])=>`<div class="stat"><span class="muted small">${k}</span><b>${v}</b></div>`).join("");
  ppChart(S.history||[]);
  const draw=()=>{
@@ -302,12 +304,12 @@ function paperSection(D){
    sortable($("#t-pp"),rs,[
     ["Bought",p=>esc(p.opened),p=>p.opened],["Stock",p=>`<b>${esc(p.ticker)}</b> <span class="muted small">${esc((p.name||"").slice(0,22))}</span>`,p=>p.ticker],
     ["Strategy",p=>esc(p.structure),p=>p.structure],["Until",p=>esc(p.expiry||p.stop_date||"–"),p=>p.expiry||p.stop_date],
-    ["Put in",p=>usd(p.invested),p=>p.invested,1],["Worth",p=>usd(Math.round(p.value)),p=>p.value,1],["Profit $",p=>pld(p.pl),p=>p.pl,1],
-    ["Profit %",p=>plc(p.plp),p=>p.plp,1],["Per year in market",p=>plc(p.py),p=>p.py,1],["Days",p=>p.days,p=>p.days,1],
-    ["Status",p=>p.status==="open"?"open":`closed ${esc(p.closed)}: ${esc(p.exit_reason)}`,p=>p.status+(p.closed||"")],
+    ["Put in",p=>bought(p)?usd(p.invested):"–",p=>bought(p)?p.invested:null,1],["Worth",p=>bought(p)?usd(Math.round(p.value)):"–",p=>bought(p)?p.value:null,1],["Profit $",p=>pld(p.pl),p=>p.pl,1],
+    ["Profit %",p=>plc(p.plp),p=>p.plp,1],["Per year in market",p=>plc(p.py),p=>p.py,1],["Days",p=>p.days??"–",p=>p.days,1],
+    ["Status",p=>p.status==="open"?`open <span class="muted small">bought ${esc((p.filled_at||p.opened).replace("T"," "))}</span>`:p.status==="closed"?`closed ${esc(p.closed)}: ${esc(p.exit_reason)}`:p.status==="pending"?"waiting to buy at the open":"not bought",p=>p.status+(p.closed||"")],
     ["Valued from",p=>`<span class="small ${p.mark_source==="model"?"flag":"muted"}">${esc(p.mark_source)}</span>`,p=>p.mark_source]],0);
   }else{
-   const G={};rs.forEach(p=>{const k=p[grp];(G[k]=G[k]||{key:k,n:0,open:0,inv:0,val:0,iy:0});const g=G[k];g.n++;g.open+=p.status==="open";g.inv+=p.invested;g.val+=p.value;g.iy+=p.invested*yrs(p)});
+   const G={};rs.filter(bought).forEach(p=>{const k=p[grp];(G[k]=G[k]||{key:k,n:0,open:0,inv:0,val:0,iy:0});const g=G[k];g.n++;g.open+=p.status==="open";g.inv+=p.invested;g.val+=p.value;g.iy+=p.invested*yrs(p)});
    const gs=Object.values(G).map(g=>({...g,pl:g.val-g.inv,plp:(g.val/g.inv-1)*100,py:(g.val-g.inv)/g.iy*100}));
    const label={structure:"Strategy",ticker:"Stock",opened:"Day bought"}[grp];
    sortable($("#t-pp"),gs,[[label,g=>`<b>${esc(g.key)}</b>`,g=>g.key],["Positions",g=>g.n,g=>g.n,1],["Open",g=>g.open,g=>g.open,1],

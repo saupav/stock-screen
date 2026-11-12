@@ -4,17 +4,21 @@ Bookkeeping only. Nothing is sent to a broker and no order is placed or simulate
 this file just records what the money would be worth if it had followed the cards.
 
 Rules (ASSUMPTION: chosen defaults, not from the written screen rules):
-- Each weekday, STAKE dollars go into each of that day's "best_today" picks, in the structure the
-  card shows, at the mid of each option leg's bid and ask (shares at the run's price).
-- STAKE is the most the position can lose: shares buy STAKE of stock; a debit structure buys
-  STAKE / (debit x 100) contracts; a cash-secured put sells STAKE / ((strike - credit) x 100).
-  Fractional quantities are fine; this is bookkeeping.
+- Picks: the scheduled morning run (6:15 AM Chicago, before the open) records that day's
+  "best_today" five as pending buys, in the structure each card shows.
+- Fills: a second run shortly after the open (9:00 AM Chicago in winter, 10:00 AM in summer)
+  buys them: shares at that day's opening price, options at the mid of each leg's live bid and
+  ask at that moment. A pick with no live quote stays pending and is tried again on the next fill
+  run; after MAX_FILL_TRIES failed tries it's marked not filled and never counts.
+- STAKE dollars go into each, and STAKE is the most each can lose: shares buy STAKE of stock; a
+  debit structure buys STAKE / (debit x 100) contracts; a cash-secured put sells
+  STAKE / ((strike - credit) x 100). Fractional quantities are fine; this is bookkeeping.
 - A position closes when the stock gets back to the prior 52-week high it was measured from,
   when its options expire (at intrinsic value), or, for shares, after the holding time the card
-  showed. Otherwise it's valued every run from fresh quotes: the mid when there's a live bid and
+  showed. Otherwise each run values it from fresh quotes: the mid when there's a live bid and
   ask, else the last trade, else a Black-Scholes estimate (each flagged by its source).
-- Positions are only ever added and closed. A past day's record is never rewritten; a second run
-  on the same day updates only that day's line.
+- Positions are only ever added, filled and closed. A past day's record is never rewritten; a
+  later run on the same day updates only that day's line.
 """
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ import math
 from pathlib import Path
 
 STAKE = 1000.0
+MAX_FILL_TRIES = 3
 MULT = {"shares": 1, "call": 100, "spread": 100, "csp": 100, "leaps": 100}
 KIND = {"Shares (no options)": "shares", "Long call": "call", "Bull call spread": "spread",
         "Cash-secured put": "csp", "LEAPS call (deep in the money)": "leaps"}
@@ -45,17 +50,19 @@ def load(path: Path):
     return empty()
 
 
-def mid(leg):
-    b, a = leg.get("bid") or 0, leg.get("ask") or 0
-    return (b + a) / 2 if b > 0 and a > 0 else None
-
-
 def sign(side):
     return 1 if side == "buy" else -1
 
 
-def open_day(state, best, options, spots, today: dt.date):
-    """Add today's positions unless today already has some. Returns how many were added."""
+def _live_mid(row):
+    if not row:
+        return None
+    b, a = row.get("bid") or 0, row.get("ask") or 0
+    return (b + a) / 2 if b > 0 and a > 0 else None
+
+
+def pick_day(state, best, options, today: dt.date):
+    """Record today's five as pending buys, once per weekday. Returns how many were added."""
     d = today.isoformat()
     if today.weekday() >= 5 or any(p["opened"] == d for p in state["positions"]):
         return 0
@@ -65,37 +72,63 @@ def open_day(state, best, options, spots, today: dt.date):
         kind = KIND.get(name)
         o = options.get(t) or {}
         st = next((s for s in o.get("structures", []) if s["structure"] == name), None)
-        spot = spots.get(t)
-        if not kind or not st or not spot:
-            state["notes"].append(f"{d}: skipped {t}, no quote for its structure.")
+        if not kind or not st:
+            state["notes"].append(f"{d}: skipped {t}, its structure wasn't in the options study.")
             continue
-        legs = [{"side": l["side"], "type": l["type"], "strike": l["strike"], "mid": mid(l)} for l in st["legs"]]
-        if kind == "shares":
-            unit, max_loss_unit = spot, spot
-        else:
-            if any(l["mid"] is None for l in legs):
-                state["notes"].append(f"{d}: skipped {t}, an option leg had no live bid and ask.")
-                continue
-            unit = sum(sign(l["side"]) * l["mid"] for l in legs)
-            max_loss_unit = (legs[0]["strike"] + unit) if kind == "csp" else unit  # csp: unit is -credit
-        if max_loss_unit <= 0:
-            state["notes"].append(f"{d}: skipped {t}, its quotes gave no money at risk.")
-            continue
-        qty = STAKE / (max_loss_unit * MULT[kind])
-        months = st.get("months") or 12
         state["positions"].append({
             "id": f"{d}-{t}", "opened": d, "ticker": t, "name": c.get("name"), "verdict": c.get("verdict"),
-            "structure": name, "kind": kind, "legs": [{k: l[k] for k in ("side", "type", "strike")} for l in legs],
-            "expiry": st.get("expiry"), "target": o.get("up_price"), "spot_in": round(spot, 4),
-            "stop_date": None if st.get("expiry") else (today + dt.timedelta(days=round(months * DAYS_PER_MONTH))).isoformat(),
-            "qty": round(qty, 6), "unit_in": round(unit, 4), "invested": STAKE,
-            "unit": round(unit, 4), "value": STAKE, "mark_date": d, "mark_source": "entry",
-            "status": "open", "closed": None, "exit_reason": None,
+            "structure": name, "kind": kind, "legs": [{k: l[k] for k in ("side", "type", "strike")} for l in st["legs"]],
+            "expiry": st.get("expiry"), "target": o.get("up_price"), "months": st.get("months") or 12,
+            "stop_date": None, "qty": 0.0, "unit_in": None, "invested": 0.0, "unit": None, "value": 0.0,
+            "spot_in": None, "filled_at": None, "fill_tries": 0, "mark_date": None, "mark_source": "waiting for the open",
+            "status": "pending", "closed": None, "exit_reason": None,
         })
         added += 1
     if added and not state["started"]:
         state["started"] = d
     return added
+
+
+def fill(state, opens, chains, now: dt.datetime):
+    """Buy pending picks. opens: {ticker: today's opening price}; chains: {(ticker, expiry): {(type, strike): row}}.
+    Returns how many were filled."""
+    today = now.date()
+    filled = 0
+    for p in state["positions"]:
+        if p["status"] != "pending":
+            continue
+        t, spot = p["ticker"], opens.get(p["ticker"])
+        why = None
+        if not spot:
+            why = "no opening price yet"
+        elif p["kind"] == "shares":
+            unit = max_loss_unit = spot
+        else:
+            ch = chains.get((t, p["expiry"])) or {}
+            mids = [_live_mid(ch.get((l["type"], float(l["strike"])))) for l in p["legs"]]
+            if any(m is None for m in mids):
+                why = "an option leg had no live bid and ask"
+            else:
+                unit = sum(sign(l["side"]) * m for l, m in zip(p["legs"], mids))
+                max_loss_unit = (p["legs"][0]["strike"] + unit) if p["kind"] == "csp" else unit  # csp: unit is -credit
+        if why is None and max_loss_unit <= 0:
+            why = "its quotes gave no money at risk"
+        if why:
+            p["fill_tries"] = p.get("fill_tries", 0) + 1
+            if p["fill_tries"] >= MAX_FILL_TRIES:
+                p["status"], p["mark_source"] = "not filled", f"not filled: {why}"
+            state["notes"].append(f"{today}: {t} not bought yet, {why}.")
+            continue
+        p["qty"] = round(STAKE / (max_loss_unit * MULT[p["kind"]]), 6)
+        p["unit_in"] = p["unit"] = round(unit, 4)
+        p["invested"] = p["value"] = STAKE
+        p["spot_in"] = round(spot, 4)
+        p["filled_at"] = now.isoformat(timespec="minutes")
+        p["mark_date"], p["mark_source"], p["status"] = today.isoformat(), "bought at the open", "open"
+        if not p["expiry"]:
+            p["stop_date"] = (today + dt.timedelta(days=round(p["months"] * DAYS_PER_MONTH))).isoformat()
+        filled += 1
+    return filled
 
 
 def intrinsic(leg, spot):
@@ -120,7 +153,7 @@ def bs(S, K, vol, t, call, r=0.0):
 
 def leg_now(leg, chain, spot, vol, years, r):
     """(signed per-share value, source) for one option leg."""
-    row = (chain or {}).get((leg["type"], leg["strike"]))
+    row = (chain or {}).get((leg["type"], float(leg["strike"])))
     if row:
         b, a, last = row.get("bid") or 0, row.get("ask") or 0, row.get("lastPrice") or 0
         if b > 0 and a > 0:
@@ -132,8 +165,8 @@ def leg_now(leg, chain, spot, vol, years, r):
 
 
 def mark(state, spots, chains, vols, today: dt.date, r=0.04):
-    """Value every open position. spots: {ticker: price}; chains: {(ticker, expiry): {(type, strike): row}};
-    vols: {ticker: annual vol}. Returns how many closed."""
+    """Value every open position bought before today. spots: {ticker: price};
+    chains: {(ticker, expiry): {(type, strike): row}}; vols: {ticker: annual vol}. Returns how many closed."""
     d = today.isoformat()
     closed = 0
     for p in state["positions"]:
@@ -171,12 +204,13 @@ def mark(state, spots, chains, vols, today: dt.date, r=0.04):
 
 
 def totals(state):
-    ps = state["positions"]
+    ps = [p for p in state["positions"] if p["status"] in ("open", "closed")]
     inv = sum(p["invested"] for p in ps)
     val = sum(p["value"] for p in ps)
     return {"invested": round(inv, 2), "value": round(val, 2), "pl": round(val - inv, 2),
             "pl_pct": round((val / inv - 1) * 100, 2) if inv else None,
-            "open": sum(p["status"] == "open" for p in ps), "closed": sum(p["status"] == "closed" for p in ps)}
+            "open": sum(p["status"] == "open" for p in ps), "closed": sum(p["status"] == "closed" for p in ps),
+            "pending": sum(p["status"] == "pending" for p in state["positions"])}
 
 
 def record(state, today: dt.date):
@@ -191,12 +225,12 @@ def record(state, today: dt.date):
     return line
 
 
-def needed_chains(state, today: dt.date):
-    """(ticker, expiry) pairs that need fresh option quotes for marking."""
+def needed_chains(state, today: dt.date, status="open"):
+    """(ticker, expiry) pairs that need option quotes: open positions to value, or pending ones to buy."""
     d = today.isoformat()
     return sorted({(p["ticker"], p["expiry"]) for p in state["positions"]
-                   if p["status"] == "open" and p["kind"] != "shares" and p["opened"] != d
-                   and p["expiry"] and p["expiry"] > d})
+                   if p["status"] == status and p["kind"] != "shares" and p["expiry"] and p["expiry"] > d
+                   and (status == "pending" or p["opened"] != d)})
 
 
 def chain_rows(ch):

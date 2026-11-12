@@ -187,11 +187,19 @@ _opts = {"S": {"up_price": 120.0, "structures": [{"structure": "Shares (no optio
                         {"side": "sell", "type": "call", "strike": 130.0, "bid": 2.0, "ask": 4.0}]}]}}
 _best = [{"ticker": "S", "structure": "Shares (no options)"}, {"ticker": "B", "structure": "Bull call spread"}]
 st = _paper.empty()
-check(_paper.open_day(st, _best, _opts, {"S": 100.0, "B": 100.0}, _d1) == 2, "paper: opens one position per pick")
-check(_paper.open_day(st, _best, _opts, {"S": 100.0, "B": 100.0}, _d1) == 0, "paper: a second run the same day opens nothing")
+check(_paper.pick_day(st, _best, _opts, _d1) == 2 and all(p["status"] == "pending" and p["invested"] == 0 for p in st["positions"]),
+      "paper: the morning run records the picks as pending buys, with nothing put in yet")
+check(_paper.pick_day(st, _best, _opts, _d1) == 0, "paper: a second run the same day picks nothing")
+check(_paper.totals(st)["invested"] == 0 and _paper.totals(st)["pending"] == 2, "paper: pending picks don't count in the totals")
+_open_ch = {("B", "2027-06-17"): {("call", 100.0): {"bid": 9.0, "ask": 11.0}, ("call", 130.0): {"bid": 2.0, "ask": 4.0}}}
+_now = _dt.datetime(2026, 11, 12, 9, 0)
+check(_paper.fill(st, {}, {}, _now) == 0 and st["positions"][0]["status"] == "pending" and st["positions"][0]["fill_tries"] == 1,
+      "paper: no opening price yet leaves the pick pending")
+check(_paper.fill(st, {"S": 100.0, "B": 100.0}, _open_ch, _now) == 2, "paper: the after-open run buys the pending picks")
 sh, sp = st["positions"]
-check(abs(sh["qty"] - 10) < 1e-9 and abs(sp["unit_in"] - 7.0) < 1e-9 and abs(sp["qty"] - 1000 / 700) < 1e-6,
-      "paper: $1,000 at risk each (10 shares at $100; spread at its $7 mid)")
+check(abs(sh["qty"] - 10) < 1e-9 and sh["spot_in"] == 100.0 and abs(sp["unit_in"] - 7.0) < 1e-9 and abs(sp["qty"] - 1000 / 700) < 1e-6
+      and sh["stop_date"] == "2027-05-14" and sp["filled_at"].startswith("2026-11-12T09:00"),
+      "paper: $1,000 at risk each (10 shares at the $100 open; spread at its $7 mid), fill time kept")
 _paper.record(st, _d1)
 _d2 = _dt.date(2026, 11, 13)
 _ch = {("B", "2027-06-17"): {("call", 100.0): {"bid": 14, "ask": 16, "lastPrice": 15}, ("call", 130.0): {"bid": 4, "ask": 6, "lastPrice": 5}}}
@@ -207,7 +215,12 @@ check(sh["value"] == _v and sp["status"] == "closed" and abs(sp["value"] - 1000 
       "paper: closed positions stay frozen; expired spread pays its intrinsic value")
 _paper.record(st, _d2); _h = list(st["history"]); _paper.record(st, _d2)
 check(len(st["history"]) == 2 and st["history"][0] == _h[0], "paper: history keeps earlier days and replaces only today's line")
-check(_paper.open_day(_paper.empty(), _best, _opts, {"S": 100.0, "B": 100.0}, _dt.date(2026, 11, 14)) == 0, "paper: no opening on a weekend")
+check(_paper.pick_day(_paper.empty(), _best, _opts, _dt.date(2026, 11, 14)) == 0, "paper: no picks on a weekend")
+_s3 = _paper.empty(); _paper.pick_day(_s3, _best[1:], _opts, _d1)
+for _ in range(3):
+    _paper.fill(_s3, {"B": 100.0}, {}, _now)
+check(_s3["positions"][0]["status"] == "not filled" and _paper.totals(_s3)["invested"] == 0,
+      "paper: a pick with no live option quotes after 3 tries is marked not filled and never counts")
 json.dumps(st, allow_nan=False)
 
 # ---- strategies and attention

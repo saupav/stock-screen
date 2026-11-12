@@ -201,10 +201,14 @@ def best_today(opportunities, rows_by, bt, n=BEST_N):
     return out
 
 
-def run_paper(best, opt, stocks, P, treasury, path):
-    """Update the hypothetical portfolio (bookkeeping only; no broker, no orders)."""
+def chicago_now():
     from zoneinfo import ZoneInfo
-    today = dt.datetime.now(ZoneInfo("America/Chicago")).date()
+    return dt.datetime.now(ZoneInfo("America/Chicago"))
+
+
+def run_paper(best, opt, stocks, P, treasury, path, buy=False):
+    """Update the hypothetical portfolio (bookkeeping only; no broker, no orders)."""
+    today = chicago_now().date()
     state = paper.load(path)
     spots = {t: num(s["info"].get("currentPrice")) or num(s["info"].get("regularMarketPrice"))
              for t, s in stocks.items()}
@@ -230,11 +234,55 @@ def run_paper(best, opt, stocks, P, treasury, path):
                 m = sum(lr) / len(lr)
                 vols[t] = 1.1 * math.sqrt(sum((x - m) ** 2 for x in lr) / (len(lr) - 1) * 252)
     closed = paper.mark(state, spots, chains, vols, today, r=treasury or 0.04)
-    added = paper.open_day(state, best, opt, spots, today)
+    added = paper.pick_day(state, best, opt, today) if buy else 0
     line = paper.record(state, today)
     path.write_text(json.dumps(state, separators=(",", ":"), allow_nan=False))
-    print(f"Paper portfolio: {added} opened, {closed} closed, value ${line['value']:,.0f} on ${line['invested']:,.0f}")
+    print(f"Paper portfolio: {added} picked to buy at the open, {closed} closed, "
+          f"value ${line['value']:,.0f} on ${line['invested']:,.0f}")
     return state
+
+
+def fill_only(out):
+    """After the open: buy the morning's pending picks, then refresh the paper numbers in both result files."""
+    path = out.parent / "paper.json"
+    state = paper.load(path)
+    now = chicago_now()
+    pend = [p for p in state["positions"] if p["status"] == "pending"]
+    if not pend:
+        print("Paper portfolio: nothing waiting to buy.")
+        return
+    opens = {}
+    for t in sorted({p["ticker"] for p in pend}):
+        try:
+            h = with_retry(lambda: yf.Ticker(t).history(period="5d", interval="1d", auto_adjust=False))
+            if len(h) and h.index[-1].date() == now.date() and h["Open"].iloc[-1] > 0:
+                opens[t] = float(h["Open"].iloc[-1])
+        except Exception as e:
+            print(f"paper open {t}: {e}", file=sys.stderr)
+        time.sleep(1.0)
+    chains = {}
+    for t, e in paper.needed_chains(state, now.date(), status="pending"):
+        try:
+            chains[(t, e)] = paper.chain_rows(with_retry(lambda: yf.Ticker(t).option_chain(e)))
+        except Exception as ex:
+            print(f"paper quotes {t} {e}: {ex}", file=sys.stderr)
+        time.sleep(1.0)
+    n = paper.fill(state, opens, chains, now)
+    line = paper.record(state, now.date())
+    path.write_text(json.dumps(state, separators=(",", ":"), allow_nan=False))
+    for name in ("results.json", "summary.json"):
+        p = out.parent / name
+        if not p.exists():
+            continue
+        d = json.loads(p.read_text())
+        if name == "results.json":
+            d["paper"] = state
+            p.write_text(json.dumps(d, separators=(",", ":"), allow_nan=False, default=str))
+        else:
+            tot = paper.totals(state)
+            d["paper_total_invested"], d["paper_value"], d["paper_pl_pct"] = tot["invested"], tot["value"], tot["pl_pct"]
+            p.write_text(json.dumps(d, indent=1))
+    print(f"Paper portfolio: bought {n} of {len(pend)} at the open; ${line['invested']:,.0f} put in so far")
 
 
 def main():
@@ -246,8 +294,15 @@ def main():
     ap.add_argument("--no-attention", action="store_true", help="skip Reddit and Google Trends")
     ap.add_argument("--no-options", action="store_true", help="skip the options study")
     ap.add_argument("--no-paper", action="store_true", help="skip the hypothetical portfolio")
+    ap.add_argument("--paper-buy", action="store_true",
+                    help="record today's best five as pending buys (the scheduled morning run only)")
+    ap.add_argument("--fill-only", action="store_true",
+                    help="after the open: buy the pending picks and update the paper numbers, nothing else")
     ap.add_argument("--out", default=str(ROOT / "docs" / "results.json"))
     a = ap.parse_args()
+    if a.fill_only:
+        fill_only(Path(a.out))
+        return
 
     extras = read_list(ROOT / "tickers_extra.txt") if (ROOT / "tickers_extra.txt").exists() else []
     universe = list(dict.fromkeys(sp500() + extras))
@@ -367,7 +422,7 @@ def main():
     paper_state = None
     if not a.no_paper:
         try:
-            paper_state = run_paper(best, opt, stocks, P, ty, out.parent / "paper.json")
+            paper_state = run_paper(best, opt, stocks, P, ty, out.parent / "paper.json", buy=a.paper_buy)
         except Exception as e:
             print(f"paper portfolio failed: {e}", file=sys.stderr)
 
