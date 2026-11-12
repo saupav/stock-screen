@@ -8,6 +8,7 @@ about two Yahoo calls per ticker.
 from __future__ import annotations
 
 import argparse
+import math
 import datetime as dt
 import io
 import json
@@ -24,6 +25,7 @@ import yfinance as yf
 import attention
 import backtest
 import options_study
+import paper
 import strategies
 from scoring import num, run_screens
 
@@ -199,6 +201,42 @@ def best_today(opportunities, rows_by, bt, n=BEST_N):
     return out
 
 
+def run_paper(best, opt, stocks, P, treasury, path):
+    """Update the hypothetical portfolio (bookkeeping only; no broker, no orders)."""
+    from zoneinfo import ZoneInfo
+    today = dt.datetime.now(ZoneInfo("America/Chicago")).date()
+    state = paper.load(path)
+    spots = {t: num(s["info"].get("currentPrice")) or num(s["info"].get("regularMarketPrice"))
+             for t, s in stocks.items()}
+    open_t = {p["ticker"] for p in state["positions"] if p["status"] == "open"}
+    for t in sorted(open_t - {k for k, v in spots.items() if v}):
+        try:
+            spots[t] = float(with_retry(lambda: yf.Ticker(t).fast_info["last_price"]))
+        except Exception as e:
+            print(f"paper price {t}: {e}", file=sys.stderr)
+    chains = {}
+    for t, e in paper.needed_chains(state, today):
+        try:
+            chains[(t, e)] = paper.chain_rows(with_retry(lambda: yf.Ticker(t).option_chain(e)))
+        except Exception as ex:
+            print(f"paper quotes {t} {e}: {ex}", file=sys.stderr)
+        time.sleep(1.0)
+    vols = {}
+    if P is not None:
+        for t in open_t & set(P.columns):
+            s = P[t].dropna().tail(64)
+            if len(s) > 20:
+                lr = [math.log(b / a) for a, b in zip(s[:-1], s[1:]) if a > 0 and b > 0]
+                m = sum(lr) / len(lr)
+                vols[t] = 1.1 * math.sqrt(sum((x - m) ** 2 for x in lr) / (len(lr) - 1) * 252)
+    closed = paper.mark(state, spots, chains, vols, today, r=treasury or 0.04)
+    added = paper.open_day(state, best, opt, spots, today)
+    line = paper.record(state, today)
+    path.write_text(json.dumps(state, separators=(",", ":"), allow_nan=False))
+    print(f"Paper portfolio: {added} opened, {closed} closed, value ${line['value']:,.0f} on ${line['invested']:,.0f}")
+    return state
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="only the first N tickers (testing)")
@@ -207,6 +245,7 @@ def main():
     ap.add_argument("--no-strategies", action="store_true", help="skip the side-by-side strategy backtests")
     ap.add_argument("--no-attention", action="store_true", help="skip Reddit and Google Trends")
     ap.add_argument("--no-options", action="store_true", help="skip the options study")
+    ap.add_argument("--no-paper", action="store_true", help="skip the hypothetical portfolio")
     ap.add_argument("--out", default=str(ROOT / "docs" / "results.json"))
     a = ap.parse_args()
 
@@ -298,7 +337,7 @@ def main():
         opportunities.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
 
     # Side-by-side strategy backtests (recomputed when the weekly price cache refreshes).
-    strat, signals = None, {}
+    strat, signals, P = None, {}, None
     flagged_all = list(dict.fromkeys([r["ticker"] for r in below] + [r["ticker"] for r in top10]))
     if not a.no_strategies:
         P, refreshed = universe_prices(list(stocks))
@@ -322,6 +361,16 @@ def main():
         o["attention"] = att.get(o["ticker"])
         o["attention_boost"] = round(attention.boost((att.get(o["ticker"]) or {}).get("change")), 3)
 
+    best = best_today(opportunities, {r["ticker"]: r for r in rows}, bt)
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    paper_state = None
+    if not a.no_paper:
+        try:
+            paper_state = run_paper(best, opt, stocks, P, ty, out.parent / "paper.json")
+        except Exception as e:
+            print(f"paper portfolio failed: {e}", file=sys.stderr)
+
     result = {
         "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "universe": len(universe),
@@ -338,7 +387,8 @@ def main():
         "backtest": bt,
         "options": opt,
         "opportunities": opportunities,
-        "best_today": best_today(opportunities, {r["ticker"]: r for r in rows}, bt),
+        "best_today": best,
+        "paper": paper_state,
         "strategies": strat,
         "signals": signals,
         "attention": att,
@@ -363,6 +413,10 @@ def main():
                                    "payoff_up": (o["best_detail"] or {}).get("payoff_up")}
                                 for o in opportunities[:10]]
     summary["best_today"] = result["best_today"]
+    if paper_state:
+        tot = paper.totals(paper_state)
+        summary["paper_total_invested"], summary["paper_value"], summary["paper_pl_pct"] = (
+            tot["invested"], tot["value"], tot["pl_pct"])
     (out.parent / "summary.json").write_text(json.dumps(summary, indent=1))
     print(json.dumps(summary, indent=1))
     if len(stocks) < 0.8 * len(universe):

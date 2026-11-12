@@ -178,6 +178,38 @@ bt_ = _screen.best_today(ops, {"A": {"name": "Alpha"}}, {"A": {"episodes": 4, "m
 check([x["ticker"] for x in bt_] == ["A", "D"] and bt_[0]["name"] == "Alpha" and bt_[0]["median_recovery_months"] == 6,
       "best today: ADD-REVIEW only, positive scores, in ranking order, with name and recovery time")
 
+# ---- paper portfolio
+import paper as _paper
+_d1 = _dt.date(2026, 11, 12)
+_opts = {"S": {"up_price": 120.0, "structures": [{"structure": "Shares (no options)", "legs": [], "months": 6, "expiry": None}]},
+         "B": {"up_price": 130.0, "structures": [{"structure": "Bull call spread", "months": 7, "expiry": "2027-06-17",
+               "legs": [{"side": "buy", "type": "call", "strike": 100.0, "bid": 9.0, "ask": 11.0},
+                        {"side": "sell", "type": "call", "strike": 130.0, "bid": 2.0, "ask": 4.0}]}]}}
+_best = [{"ticker": "S", "structure": "Shares (no options)"}, {"ticker": "B", "structure": "Bull call spread"}]
+st = _paper.empty()
+check(_paper.open_day(st, _best, _opts, {"S": 100.0, "B": 100.0}, _d1) == 2, "paper: opens one position per pick")
+check(_paper.open_day(st, _best, _opts, {"S": 100.0, "B": 100.0}, _d1) == 0, "paper: a second run the same day opens nothing")
+sh, sp = st["positions"]
+check(abs(sh["qty"] - 10) < 1e-9 and abs(sp["unit_in"] - 7.0) < 1e-9 and abs(sp["qty"] - 1000 / 700) < 1e-6,
+      "paper: $1,000 at risk each (10 shares at $100; spread at its $7 mid)")
+_paper.record(st, _d1)
+_d2 = _dt.date(2026, 11, 13)
+_ch = {("B", "2027-06-17"): {("call", 100.0): {"bid": 14, "ask": 16, "lastPrice": 15}, ("call", 130.0): {"bid": 4, "ask": 6, "lastPrice": 5}}}
+_paper.mark(st, {"S": 110.0, "B": 110.0}, _ch, {}, _d2)
+check(abs(sh["value"] - 1100) < 0.01 and abs(sp["value"] - 1000 / 700 * 100 * 10) < 0.01 and sp["mark_source"] == "quotes",
+      "paper: marked from price and from leg mids")
+_paper.mark(st, {"S": 121.0, "B": 110.0}, {}, {"B": 0.3}, _dt.date(2026, 11, 16))
+check(sh["status"] == "closed" and sh["exit_reason"] == "back at the prior high" and sp["mark_source"] == "model",
+      "paper: closes at the prior high; no quotes falls back to the model, flagged")
+_v = sh["value"]
+_paper.mark(st, {"S": 50.0, "B": 140.0}, {}, {}, _dt.date(2027, 6, 18))
+check(sh["value"] == _v and sp["status"] == "closed" and abs(sp["value"] - 1000 / 700 * 100 * 30) < 0.01,
+      "paper: closed positions stay frozen; expired spread pays its intrinsic value")
+_paper.record(st, _d2); _h = list(st["history"]); _paper.record(st, _d2)
+check(len(st["history"]) == 2 and st["history"][0] == _h[0], "paper: history keeps earlier days and replaces only today's line")
+check(_paper.open_day(_paper.empty(), _best, _opts, {"S": 100.0, "B": 100.0}, _dt.date(2026, 11, 14)) == 0, "paper: no opening on a weekend")
+json.dumps(st, allow_nan=False)
+
 # ---- strategies and attention
 import os as _os
 import numpy as _np

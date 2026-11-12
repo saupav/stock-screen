@@ -22,6 +22,7 @@ and Yahoo doesn't allow browser calls. A scheduled job has none of those limits.
 | `options_study.py` | Options structures sized to past recovery times, and the reward-per-time ranking. |
 | `strategies.py` | Side-by-side backtests of well-documented strategies on the universe. |
 | `attention.py` | Reddit mentions and Google search interest for flagged stocks (optional). |
+| `paper.py` | The hypothetical $1,000-a-pick portfolio, kept in `docs/paper.json`. |
 | `screen.py` | Fetches the data and writes `docs/results.json` and `docs/summary.json`. |
 | `docs/index.html` | The results page. |
 | `.github/workflows/daily-screen.yml` | Runs at 12:15 UTC Monday to Friday (6:15 AM Chicago in winter, 7:15 AM in summer), and on demand. |
@@ -35,6 +36,25 @@ score (see the options study below), each with its company name, verdict (master
 have a green border), the chosen structure and expiry, cost, max loss, payoff if it gets back to the
 prior high, recovery odds in that time, typical recovery time from its past drops, and any risk flags.
 The same list is saved as `best_today` in `docs/results.json` and `docs/summary.json`.
+
+## Hypothetical portfolio
+
+Pretend money, bookkeeping only: no real money, no broker and no orders, simulated or otherwise.
+Each weekday the job records $1,000 into each of that day's best five (`STAKE` in `paper.py`), in
+the structure its card shows, at the mid of each option leg's bid and ask (shares at the run's
+price). $1,000 is the most each position can lose: shares buy $1,000 of stock; a debit structure buys
+$1,000 ÷ (debit × 100) contracts; a cash-secured put sells $1,000 ÷ ((strike − credit) × 100).
+A position closes when the stock gets back to its prior 52-week high, when its options expire (at
+intrinsic value), or for shares after the card's holding time. Until then each run values it from
+fresh quotes: the mid with a live bid and ask, else the last trade, else a Black-Scholes estimate,
+and the page says which. Everything is kept in `docs/paper.json`; past days are never rewritten.
+
+The page shows money put in, what it's worth, profit, a chart over time, and a table sortable by
+day bought, stock, strategy, profit $, profit % and profit per year in the market, with an
+open/closed filter and totals by strategy, stock or day. `docs/summary.json` carries
+`paper_total_invested`, `paper_value` and `paper_pl_pct`.
+
+The job runs before the market opens, so entries use the prior session's quotes.
 
 ## Past drops study
 

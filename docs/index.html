@@ -42,6 +42,14 @@ details{margin-top:28px}summary{cursor:pointer;font-weight:600}
 .card .nm{color:var(--muted);font-size:13px;margin:0 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .st{font-weight:600;margin:8px 0 2px}
 .card dl{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 0;font-size:14px}
+.pp-ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0 8px}
+.pp-ctl select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text)}
+#pp-chart{position:relative;padding:12px 12px 6px}
+#pp-chart svg{display:block;width:100%;height:auto}
+#pp-chart .tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.12);display:none;white-space:nowrap}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin:0 0 6px}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid;vertical-align:middle;margin-right:6px}
+.up{color:var(--good)}.down{color:var(--bad)}
 .card dt{color:var(--muted)}.card dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
 button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
 </style>
@@ -55,6 +63,16 @@ button{font:inherit;padding:6px 12px;border-radius:8px;border:1px solid var(--li
 <h2 style="margin-top:18px">Best opportunities today</h2>
 <div class="muted small" id="best-rule">Ranked by expected return on the money at risk, per year in the market, from each stock's own past drops. ADD-REVIEW stocks only, best liquid structure each. Green border = masters-confirmed. A mechanical historical study, not advice.</div>
 <div class="best" id="best"></div>
+
+<h2>Hypothetical portfolio: $1,000 into each of the top five, every weekday</h2>
+<div class="banner small"><b>Pretend money, bookkeeping only.</b> No real money, no broker and no orders, simulated or otherwise. Each weekday the job records $1,000 into each of that day's five cards, in the structure the card shows, at the mid of each option's bid and ask (shares at the run's price). $1,000 is the most each can lose. A position closes when the stock gets back to its prior high, when its options expire, or for shares after the card's holding time; until then it's valued every run from fresh quotes. A mechanical study, not advice.</div>
+<div class="stats" id="pp-stats"></div>
+<div class="panel" id="pp-chart"></div>
+<div class="pp-ctl small"><label>Show <select id="pp-show"><option value="all">All positions</option><option value="open">Open</option><option value="closed">Closed</option></select></label>
+<label>Group by <select id="pp-group"><option value="pos">Each position</option><option value="structure">Strategy</option><option value="ticker">Stock</option><option value="opened">Day bought</option></select></label>
+<span class="muted">Click a column to sort.</span></div>
+<div class="panel"><table id="t-pp"></table></div>
+<div id="pp-notes" class="small muted" style="margin-top:6px"></div>
 
 <div class="stats" id="stats"></div>
 
@@ -227,6 +245,80 @@ function bestCards(D){
   <dt>Typical recovery</dt><dd>${esc(rec)}</dd><dt>Down from 52-week high</dt><dd>${c.drop_now==null?"–":c.drop_now+"%"}</dd></dl>
   ${(c.flags||[]).length?`<div style="margin-top:8px">${flags(c)}</div>`:""}${c.past_drops!=null&&c.past_drops<3?`<div class="small muted" style="margin-top:6px">Only ${c.past_drops} past drop${c.past_drops===1?"":"s"} this size, so the odds are thin.</div>`:""}</div>`}).join("");
 }
+function sortable(el,rows,cols,initial){
+ let sortI=initial??null,dir=-1;
+ const draw=()=>{let rs=rows.slice();
+  if(sortI!=null){const g=cols[sortI][2];rs.sort((a,b)=>{const x=g(a),y=g(b);if(x==null)return 1;if(y==null)return -1;return(x>y?1:x<y?-1:0)*dir})}
+  el.innerHTML=`<thead><tr>${cols.map((c,i)=>`<th data-i="${i}">${c[0]}${sortI===i?(dir>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead><tbody>`+
+   (rs.length?rs.map(r=>`<tr>${cols.map(c=>`<td class="${c[3]?"n":""}">${c[1](r)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${cols.length}" class="muted">Nothing here yet.</td></tr>`)+"</tbody>";
+  el.querySelectorAll("th").forEach(th=>th.onclick=()=>{const i=+th.dataset.i;if(sortI===i)dir=-dir;else{sortI=i;dir=cols[i][3]?-1:1}draw()});};
+ draw();
+}
+const yrs=p=>{const a=new Date(p.opened+"T12:00:00"),b=new Date((p.closed||p.mark_date||p.opened)+"T12:00:00");return Math.max(1,Math.round((b-a)/864e5))/365};
+const plc=v=>v==null?"–":`<span class="${v>0?"up":v<0?"down":""}">${(v>0?"+":"")+v.toFixed(1)}%</span>`;
+const pld=v=>v==null?"–":`<span class="${v>0?"up":v<0?"down":""}">${sgn(Math.round(v))}</span>`;
+function ppChart(H){
+ const el=$("#pp-chart");
+ if(!H.length){el.innerHTML=`<div class="muted small">The first day is recorded on the next run.</div>`;return}
+ const W=Math.max(320,el.clientWidth||800),Ht=240,m={l:64,r:84,t:10,b:28};
+ const xs=H.map(h=>new Date(h.date+"T12:00:00").getTime()),x0=Math.min(...xs),x1=Math.max(...xs);
+ const ys=H.flatMap(h=>[h.value,h.invested]);let y0=Math.min(0,...ys),y1=Math.max(...ys)*1.08||1;
+ const X=t=>x1===x0?m.l+(W-m.l-m.r)/2:m.l+(t-x0)/(x1-x0)*(W-m.l-m.r),Y=v=>m.t+(1-(v-y0)/(y1-y0))*(Ht-m.t-m.b);
+ const ticks=[0,.25,.5,.75,1].map(f=>y0+f*(y1-y0));
+ const path=k=>H.map((h,i)=>`${i?"L":"M"}${X(xs[i]).toFixed(1)},${Y(h[k]).toFixed(1)}`).join("");
+ const last=H[H.length-1],lx=X(xs[xs.length-1]);
+ const dfmt=t=>new Date(t).toLocaleDateString([], {month:"short",day:"numeric"});
+ el.innerHTML=`<div class="legend"><span><i style="border-color:var(--accent)"></i>Value</span><span><i style="border-color:var(--muted);border-top-style:dashed"></i>Money put in</span></div>
+ <svg viewBox="0 0 ${W} ${Ht}" role="img" aria-label="Hypothetical portfolio value and money put in over time">
+ ${ticks.map(v=>`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${m.l-8}" y="${Y(v)+4}" text-anchor="end" font-size="12" fill="var(--muted)">${usd(Math.round(v))}</text>`).join("")}
+ <text x="${X(x0)}" y="${Ht-8}" text-anchor="${x1===x0?"middle":"start"}" font-size="12" fill="var(--muted)">${dfmt(x0)}</text>${x1!==x0?`<text x="${X(x1)}" y="${Ht-8}" text-anchor="end" font-size="12" fill="var(--muted)">${dfmt(x1)}</text>`:""}
+ <path d="${path("invested")}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 4"/>
+ <path d="${path("value")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+ ${H.length<3?H.map((h,i)=>`<circle cx="${X(xs[i])}" cy="${Y(h.value)}" r="4" fill="var(--accent)" stroke="var(--panel)" stroke-width="2"/>`).join(""):""}
+ <text x="${lx+8}" y="${Y(last.value)+4}" font-size="12" fill="var(--text)">${usd(Math.round(last.value))}</text>
+ ${Math.abs(Y(last.value)-Y(last.invested))>14?`<text x="${lx+8}" y="${Y(last.invested)+4}" font-size="12" fill="var(--muted)">${usd(Math.round(last.invested))} in</text>`:""}
+ <line id="pp-x" x1="0" x2="0" y1="${m.t}" y2="${Ht-m.b}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>
+ <rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${Ht-m.t-m.b}" fill="transparent" id="pp-hit"/></svg><div class="tip" id="pp-tip"></div>`;
+ const svg=el.querySelector("svg"),hit=el.querySelector("#pp-hit"),cx=el.querySelector("#pp-x"),tip=el.querySelector("#pp-tip");
+ hit.onmousemove=e=>{const r=svg.getBoundingClientRect(),px=(e.clientX-r.left)*W/r.width;let i=0,b=1e18;xs.forEach((t,j)=>{const d=Math.abs(X(t)-px);if(d<b){b=d;i=j}});
+  const h=H[i];cx.setAttribute("x1",X(xs[i]));cx.setAttribute("x2",X(xs[i]));cx.setAttribute("visibility","visible");
+  tip.innerHTML=`<b>${dfmt(xs[i])}</b><br>Value ${usd(Math.round(h.value))}<br>Put in ${usd(Math.round(h.invested))}<br>${pld(h.pl)} (${plc(h.pl_pct)})<br><span class="muted">${h.open} open, ${h.closed} closed</span>`;
+  tip.style.display="block";const left=X(xs[i])*r.width/W+12;tip.style.left=Math.min(left,r.width-160)+"px";tip.style.top="30px"};
+ hit.onmouseleave=()=>{tip.style.display="none";cx.setAttribute("visibility","hidden")};
+}
+function paperSection(D){
+ const S=D.paper;
+ if(!S||!S.positions){$("#pp-stats").innerHTML="";$("#pp-chart").innerHTML=`<div class="muted small">Not run in this results file.</div>`;$("#t-pp").innerHTML="";return}
+ const P=S.positions.map(p=>({...p,pl:p.value-p.invested,plp:(p.value/p.invested-1)*100,py:(p.value-p.invested)/p.invested*100/yrs(p),days:Math.round(yrs(p)*365)}));
+ const inv=P.reduce((a,p)=>a+p.invested,0),val=P.reduce((a,p)=>a+p.value,0);
+ const days=new Set(P.map(p=>p.opened)).size;
+ $("#pp-stats").innerHTML=[["Put in",usd(inv)],["Worth now",usd(Math.round(val))],["Profit or loss",pld(val-inv)+" "+plc(inv?(val/inv-1)*100:null)],["Positions",`${P.filter(p=>p.status==="open").length} open, ${P.filter(p=>p.status==="closed").length} closed`],["Days bought",days+(S.started?` <span class="muted small">since ${esc(S.started)}</span>`:"")]]
+  .map(([k,v])=>`<div class="stat"><span class="muted small">${k}</span><b>${v}</b></div>`).join("");
+ ppChart(S.history||[]);
+ const draw=()=>{
+  const show=$("#pp-show").value,grp=$("#pp-group").value;
+  const rs=P.filter(p=>show==="all"||p.status===show);
+  if(grp==="pos"){
+   sortable($("#t-pp"),rs,[
+    ["Bought",p=>esc(p.opened),p=>p.opened],["Stock",p=>`<b>${esc(p.ticker)}</b> <span class="muted small">${esc((p.name||"").slice(0,22))}</span>`,p=>p.ticker],
+    ["Strategy",p=>esc(p.structure),p=>p.structure],["Until",p=>esc(p.expiry||p.stop_date||"–"),p=>p.expiry||p.stop_date],
+    ["Put in",p=>usd(p.invested),p=>p.invested,1],["Worth",p=>usd(Math.round(p.value)),p=>p.value,1],["Profit $",p=>pld(p.pl),p=>p.pl,1],
+    ["Profit %",p=>plc(p.plp),p=>p.plp,1],["Per year in market",p=>plc(p.py),p=>p.py,1],["Days",p=>p.days,p=>p.days,1],
+    ["Status",p=>p.status==="open"?"open":`closed ${esc(p.closed)}: ${esc(p.exit_reason)}`,p=>p.status+(p.closed||"")],
+    ["Valued from",p=>`<span class="small ${p.mark_source==="model"?"flag":"muted"}">${esc(p.mark_source)}</span>`,p=>p.mark_source]],0);
+  }else{
+   const G={};rs.forEach(p=>{const k=p[grp];(G[k]=G[k]||{key:k,n:0,open:0,inv:0,val:0,iy:0});const g=G[k];g.n++;g.open+=p.status==="open";g.inv+=p.invested;g.val+=p.value;g.iy+=p.invested*yrs(p)});
+   const gs=Object.values(G).map(g=>({...g,pl:g.val-g.inv,plp:(g.val/g.inv-1)*100,py:(g.val-g.inv)/g.iy*100}));
+   const label={structure:"Strategy",ticker:"Stock",opened:"Day bought"}[grp];
+   sortable($("#t-pp"),gs,[[label,g=>`<b>${esc(g.key)}</b>`,g=>g.key],["Positions",g=>g.n,g=>g.n,1],["Open",g=>g.open,g=>g.open,1],
+    ["Put in",g=>usd(g.inv),g=>g.inv,1],["Worth",g=>usd(Math.round(g.val)),g=>g.val,1],["Profit $",g=>pld(g.pl),g=>g.pl,1],
+    ["Profit %",g=>plc(g.plp),g=>g.plp,1],["Per year in market",g=>plc(g.py),g=>g.py,1]],grp==="opened"?0:5);
+  }
+ };
+ $("#pp-show").onchange=draw;$("#pp-group").onchange=draw;draw();
+ const ns=(S.notes||[]).slice(-5);
+ $("#pp-notes").innerHTML=`"Per year in market" is profit ÷ money put in ÷ years held, so early days swing widely. "Valued from" model means no usable quote that run, so a Black-Scholes estimate was used.`+(ns.length?"<br>"+ns.map(esc).join("<br>"):"");
+}
 function render(D){
  DATA=D;BY={};D.rows.forEach(r=>BY[r.ticker]=r);
  const when=new Date(D.generated_at);
@@ -240,6 +332,7 @@ function render(D){
  const pick=list=>list.map(t=>BY[t]).filter(Boolean);
  table($("#t-below"),pick(D.below_entry),["ticker","name","verdict","price","low","vs","ms","cons","flags","ins"]);
  bestCards(D);
+ paperSection(D);
  oppTable(D);
  $("#boost").onchange=()=>oppTable(D);
  btTable(D);
