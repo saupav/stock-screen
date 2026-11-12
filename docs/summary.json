@@ -1,9 +1,9 @@
 {
- "generated_at": "2026-11-12T16:42:31+00:00",
+ "generated_at": "2026-11-12T16:52:35+00:00",
  "universe": 503,
  "scored": 503,
  "gate_passed": 215,
- "below_entry_count": 37,
+ "below_entry_count": 38,
  "top10": [
   "APTV",
   "SNDK",
@@ -30,7 +30,7 @@
    "masters_score": 48.9,
    "flags": [],
    "past_drops": {
-    "drop_studied": 56.2,
+    "drop_studied": 56.4,
     "episodes": 1,
     "per_decade": 0.7,
     "median_full_months": 6.7,
@@ -41,11 +41,11 @@
   {
    "ticker": "EXE",
    "verdict": "ADD-REVIEW",
-   "value_score": 98.5,
+   "value_score": 98.2,
    "masters_score": 46.7,
    "flags": [],
    "past_drops": {
-    "drop_studied": 30.3,
+    "drop_studied": 30.0,
     "episodes": 0,
     "per_decade": 0.0,
     "median_full_months": null,
@@ -60,10 +60,10 @@
    "masters_score": 51.0,
    "flags": [],
    "past_drops": {
-    "drop_studied": 37.6,
+    "drop_studied": 37.7,
     "episodes": 8,
     "per_decade": 1.5,
-    "median_full_months": 26.8,
+    "median_full_months": 26.3,
     "pct_full_within_12m": 38,
     "longest_full_months": 75.3
    }
@@ -75,7 +75,7 @@
    "masters_score": 45.4,
    "flags": [],
    "past_drops": {
-    "drop_studied": 30.2,
+    "drop_studied": 30.3,
     "episodes": 4,
     "per_decade": 1.0,
     "median_full_months": 69.4,
@@ -86,11 +86,11 @@
   {
    "ticker": "WDC",
    "verdict": "ADD-REVIEW (masters-confirmed)",
-   "value_score": 87.2,
+   "value_score": 87.1,
    "masters_score": 52.5,
    "flags": [],
    "past_drops": {
-    "drop_studied": 61.2,
+    "drop_studied": 61.1,
     "episodes": 5,
     "per_decade": 1.1,
     "median_full_months": 79.3,
@@ -105,7 +105,7 @@
    "masters_score": 46.6,
    "flags": [],
    "past_drops": {
-    "drop_studied": 52.1,
+    "drop_studied": 52.2,
     "episodes": 4,
     "per_decade": 1.7,
     "median_full_months": 32.4,
@@ -116,28 +116,28 @@
   {
    "ticker": "NVDA",
    "verdict": "ADD-REVIEW (masters-confirmed)",
-   "value_score": 82.5,
+   "value_score": 82.9,
    "masters_score": 59.7,
    "flags": [],
    "past_drops": {
-    "drop_studied": 31.9,
+    "drop_studied": 32.4,
     "episodes": 9,
     "per_decade": 3.3,
-    "median_full_months": 9.7,
+    "median_full_months": 9.5,
     "pct_full_within_12m": 56,
-    "longest_full_months": 99.2
+    "longest_full_months": 98.9
    }
   },
   {
    "ticker": "OXY",
    "verdict": "ADD-REVIEW (flagged)",
-   "value_score": 82.1,
+   "value_score": 82.0,
    "masters_score": 33.2,
    "flags": [
     "Altman Z 1.51"
    ],
    "past_drops": {
-    "drop_studied": 13.4,
+    "drop_studied": 13.3,
     "episodes": 16,
     "per_decade": 3.6,
     "median_full_months": 6.1,
@@ -148,14 +148,14 @@
   {
    "ticker": "VRT",
    "verdict": "ADD-REVIEW",
-   "value_score": 81.7,
+   "value_score": 81.9,
    "masters_score": 42.3,
    "flags": [],
    "past_drops": {
-    "drop_studied": 44.3,
+    "drop_studied": 44.4,
     "episodes": 3,
     "per_decade": 4.0,
-    "median_full_months": 7.0,
+    "median_full_months": 6.9,
     "pct_full_within_12m": 67,
     "longest_full_months": 17.2
    }
@@ -163,11 +163,11 @@
   {
    "ticker": "ZBRA",
    "verdict": "ADD-REVIEW",
-   "value_score": 78.0,
+   "value_score": 77.7,
    "masters_score": 42.9,
    "flags": [],
    "past_drops": {
-    "drop_studied": 18.4,
+    "drop_studied": 18.3,
     "episodes": 15,
     "per_decade": 4.4,
     "median_full_months": 5.3,
@@ -176,33 +176,33 @@
    }
   },
   {
-   "ticker": "MKC",
-   "verdict": "ADD-REVIEW",
-   "value_score": 77.5,
-   "masters_score": 54.1,
-   "flags": [],
-   "past_drops": {
-    "drop_studied": 36.0,
-    "episodes": 3,
-    "per_decade": 0.6,
-    "median_full_months": 32.9,
-    "pct_full_within_12m": 33,
-    "longest_full_months": 75.8
-   }
-  },
-  {
    "ticker": "LRCX",
    "verdict": "ADD-REVIEW",
-   "value_score": 77.4,
+   "value_score": 77.5,
    "masters_score": 57.5,
    "flags": [],
    "past_drops": {
-    "drop_studied": 46.1,
+    "drop_studied": 46.4,
     "episodes": 6,
     "per_decade": 1.4,
     "median_full_months": 55.5,
     "pct_full_within_12m": 17,
     "longest_full_months": 77.8
+   }
+  },
+  {
+   "ticker": "MKC",
+   "verdict": "ADD-REVIEW",
+   "value_score": 77.2,
+   "masters_score": 54.1,
+   "flags": [],
+   "past_drops": {
+    "drop_studied": 35.8,
+    "episodes": 3,
+    "per_decade": 0.6,
+    "median_full_months": 33.0,
+    "pct_full_within_12m": 33,
+    "longest_full_months": 75.8
    }
   },
   {
@@ -212,7 +212,7 @@
    "masters_score": 44.8,
    "flags": [],
    "past_drops": {
-    "drop_studied": 45.3,
+    "drop_studied": 45.4,
     "episodes": 8,
     "per_decade": 1.5,
     "median_full_months": 28.9,
@@ -241,33 +241,33 @@
    }
   },
   {
-   "ticker": "KLAC",
+   "ticker": "AVGO",
    "verdict": "ADD-REVIEW",
-   "value_score": 71.6,
-   "masters_score": 53.2,
+   "value_score": 72.0,
+   "masters_score": 44.8,
    "flags": [],
    "past_drops": {
-    "drop_studied": 48.0,
+    "drop_studied": 26.5,
+    "episodes": 6,
+    "per_decade": 3.6,
+    "median_full_months": 3.6,
+    "pct_full_within_12m": 100,
+    "longest_full_months": 10.5
+   }
+  },
+  {
+   "ticker": "KLAC",
+   "verdict": "ADD-REVIEW",
+   "value_score": 71.7,
+   "masters_score": 54.6,
+   "flags": [],
+   "past_drops": {
+    "drop_studied": 48.2,
     "episodes": 5,
     "per_decade": 1.1,
     "median_full_months": 23.5,
     "pct_full_within_12m": 0,
     "longest_full_months": 171.9
-   }
-  },
-  {
-   "ticker": "AVGO",
-   "verdict": "ADD-REVIEW",
-   "value_score": 71.5,
-   "masters_score": 44.8,
-   "flags": [],
-   "past_drops": {
-    "drop_studied": 26.1,
-    "episodes": 7,
-    "per_decade": 4.3,
-    "median_full_months": 3.8,
-    "pct_full_within_12m": 100,
-    "longest_full_months": 10.6
    }
   },
   {
@@ -288,26 +288,11 @@
   {
    "ticker": "GOOG",
    "verdict": "ADD-REVIEW (masters-confirmed)",
-   "value_score": 70.2,
+   "value_score": 69.8,
    "masters_score": 59.4,
    "flags": [],
    "past_drops": {
-    "drop_studied": 27.1,
-    "episodes": 5,
-    "per_decade": 2.3,
-    "median_full_months": 8.3,
-    "pct_full_within_12m": 60,
-    "longest_full_months": 55.8
-   }
-  },
-  {
-   "ticker": "GOOGL",
-   "verdict": "ADD-REVIEW (masters-confirmed)",
-   "value_score": 70.1,
-   "masters_score": 59.2,
-   "flags": [],
-   "past_drops": {
-    "drop_studied": 27.1,
+    "drop_studied": 26.8,
     "episodes": 5,
     "per_decade": 2.3,
     "median_full_months": 8.3,
@@ -318,16 +303,46 @@
   {
    "ticker": "CSCO",
    "verdict": "ADD-REVIEW",
-   "value_score": 69.7,
+   "value_score": 69.8,
    "masters_score": 42.9,
    "flags": [],
    "past_drops": {
-    "drop_studied": 22.2,
+    "drop_studied": 22.3,
     "episodes": 8,
     "per_decade": 2.2,
     "median_full_months": 3.9,
     "pct_full_within_12m": 62,
     "longest_full_months": 255.9
+   }
+  },
+  {
+   "ticker": "GOOGL",
+   "verdict": "ADD-REVIEW (masters-confirmed)",
+   "value_score": 69.7,
+   "masters_score": 59.2,
+   "flags": [],
+   "past_drops": {
+    "drop_studied": 26.8,
+    "episodes": 5,
+    "per_decade": 2.3,
+    "median_full_months": 8.3,
+    "pct_full_within_12m": 60,
+    "longest_full_months": 55.8
+   }
+  },
+  {
+   "ticker": "CRH",
+   "verdict": "ADD-REVIEW",
+   "value_score": 69.3,
+   "masters_score": 38.6,
+   "flags": [],
+   "past_drops": {
+    "drop_studied": 27.8,
+    "episodes": 7,
+    "per_decade": 1.9,
+    "median_full_months": 11.8,
+    "pct_full_within_12m": 57,
+    "longest_full_months": 112.2
    }
   },
   {
@@ -348,11 +363,11 @@
   {
    "ticker": "META",
    "verdict": "ADD-REVIEW",
-   "value_score": 67.5,
-   "masters_score": 57.6,
+   "value_score": 67.4,
+   "masters_score": 56.7,
    "flags": [],
    "past_drops": {
-    "drop_studied": 19.9,
+    "drop_studied": 19.8,
     "episodes": 7,
     "per_decade": 5.1,
     "median_full_months": 3.6,
@@ -363,11 +378,11 @@
   {
    "ticker": "KEYS",
    "verdict": "ADD-REVIEW",
-   "value_score": 66.8,
+   "value_score": 67.0,
    "masters_score": 39.3,
    "flags": [],
    "past_drops": {
-    "drop_studied": 21.4,
+    "drop_studied": 21.6,
     "episodes": 4,
     "per_decade": 3.6,
     "median_full_months": 13.6,
@@ -378,13 +393,13 @@
   {
    "ticker": "CIEN",
    "verdict": "ADD-REVIEW (flagged)",
-   "value_score": 66.3,
+   "value_score": 66.4,
    "masters_score": 36.7,
    "flags": [
     "interest cover 2.7x"
    ],
    "past_drops": {
-    "drop_studied": 53.8,
+    "drop_studied": 54.1,
     "episodes": 1,
     "per_decade": 0.3,
     "median_full_months": 17.7,
@@ -395,11 +410,11 @@
   {
    "ticker": "MRVL",
    "verdict": "ADD-REVIEW",
-   "value_score": 65.8,
+   "value_score": 65.9,
    "masters_score": 50.2,
    "flags": [],
    "past_drops": {
-    "drop_studied": 49.4,
+    "drop_studied": 49.8,
     "episodes": 4,
     "per_decade": 1.6,
     "median_full_months": 41.7,
@@ -410,7 +425,7 @@
   {
    "ticker": "UBER",
    "verdict": "ADD-REVIEW",
-   "value_score": 65.1,
+   "value_score": 65.0,
    "masters_score": 44.7,
    "flags": [],
    "past_drops": {
@@ -425,11 +440,11 @@
   {
    "ticker": "GLW",
    "verdict": "ADD-REVIEW",
-   "value_score": 64.0,
+   "value_score": 64.1,
    "masters_score": 30.7,
    "flags": [],
    "past_drops": {
-    "drop_studied": 56.1,
+    "drop_studied": 56.4,
     "episodes": 2,
     "per_decade": 0.5,
     "median_full_months": 150.7,
@@ -440,7 +455,7 @@
   {
    "ticker": "TEL",
    "verdict": "ADD-REVIEW",
-   "value_score": 62.7,
+   "value_score": 62.8,
    "masters_score": 54.0,
    "flags": [],
    "past_drops": {
@@ -470,11 +485,11 @@
   {
    "ticker": "HWM",
    "verdict": "ADD-REVIEW",
-   "value_score": 61.4,
+   "value_score": 61.5,
    "masters_score": 47.7,
    "flags": [],
    "past_drops": {
-    "drop_studied": 28.0,
+    "drop_studied": 28.1,
     "episodes": 2,
     "per_decade": 2.2,
     "median_full_months": 14.4,
@@ -483,33 +498,33 @@
    }
   },
   {
-   "ticker": "HUBB",
+   "ticker": "APH",
    "verdict": "ADD-REVIEW",
-   "value_score": 54.0,
+   "value_score": 54.6,
    "masters_score": 46.2,
    "flags": [],
    "past_drops": {
-    "drop_studied": 21.8,
+    "drop_studied": 10.8,
+    "episodes": 41,
+    "per_decade": 12.0,
+    "median_full_months": 3.0,
+    "pct_full_within_12m": 87,
+    "longest_full_months": 51.0
+   }
+  },
+  {
+   "ticker": "HUBB",
+   "verdict": "ADD-REVIEW",
+   "value_score": 54.1,
+   "masters_score": 46.2,
+   "flags": [],
+   "past_drops": {
+    "drop_studied": 21.9,
     "episodes": 8,
     "per_decade": 1.5,
     "median_full_months": 9.1,
     "pct_full_within_12m": 62,
     "longest_full_months": 61.7
-   }
-  },
-  {
-   "ticker": "APH",
-   "verdict": "ADD-REVIEW",
-   "value_score": 53.6,
-   "masters_score": 46.2,
-   "flags": [],
-   "past_drops": {
-    "drop_studied": 10.0,
-    "episodes": 45,
-    "per_decade": 13.2,
-    "median_full_months": 2.1,
-    "pct_full_within_12m": 88,
-    "longest_full_months": 51.0
    }
   },
   {
@@ -530,11 +545,11 @@
   {
    "ticker": "MPWR",
    "verdict": "ADD-REVIEW",
-   "value_score": 49.3,
+   "value_score": 49.7,
    "masters_score": 47.0,
    "flags": [],
    "past_drops": {
-    "drop_studied": 15.5,
+    "drop_studied": 15.8,
     "episodes": 23,
     "per_decade": 10.9,
     "median_full_months": 2.4,
@@ -545,28 +560,28 @@
   {
    "ticker": "OKE",
    "verdict": "ADD-REVIEW (flagged)",
-   "value_score": 45.4,
+   "value_score": 45.2,
    "masters_score": 38.0,
    "flags": [
     "Altman Z 1.60"
    ],
    "past_drops": {
-    "drop_studied": 10.6,
-    "episodes": 26,
-    "per_decade": 5.7,
+    "drop_studied": 10.4,
+    "episodes": 27,
+    "per_decade": 6.0,
     "median_full_months": 4.0,
-    "pct_full_within_12m": 69,
+    "pct_full_within_12m": 70,
     "longest_full_months": 66.7
    }
   },
   {
    "ticker": "RTX",
    "verdict": "ADD-REVIEW",
-   "value_score": 35.8,
+   "value_score": 36.0,
    "masters_score": 43.7,
    "flags": [],
    "past_drops": {
-    "drop_studied": 12.1,
+    "drop_studied": 12.2,
     "episodes": 38,
     "per_decade": 6.0,
     "median_full_months": 7.8,
@@ -596,101 +611,90 @@
   {
    "ticker": "AVGO",
    "verdict": "ADD-REVIEW",
-   "score": 2.031,
+   "score": 1.613,
    "best": "Bull call spread",
    "expiry": "2027-06-17",
-   "p_recover": 0.714,
-   "cost": 3885.0,
-   "max_loss": 3885.0,
-   "payoff_up": 8115.0
+   "p_recover": 0.625,
+   "cost": 3830.0,
+   "max_loss": 3830.0,
+   "payoff_up": 8170.0
   },
   {
    "ticker": "APTV",
    "verdict": "ADD-REVIEW",
-   "score": 1.533,
+   "score": 0.944,
    "best": "Shares (no options)",
-   "expiry": "2028-01-21",
-   "p_recover": 1.0,
-   "cost": 3894.5,
-   "max_loss": 3894.5,
-   "payoff_up": 4998.5
+   "expiry": null,
+   "p_recover": 0.667,
+   "cost": 3880.5,
+   "max_loss": 3880.5,
+   "payoff_up": 5012.5
   },
   {
    "ticker": "NVDA",
    "verdict": "ADD-REVIEW (masters-confirmed)",
-   "score": 0.919,
+   "score": 0.818,
    "best": "Bull call spread",
    "expiry": "2028-06-16",
-   "p_recover": 0.778,
-   "cost": 2315.0,
-   "max_loss": 2315.0,
-   "payoff_up": 5022.0
+   "p_recover": 0.727,
+   "cost": 2475.0,
+   "max_loss": 2475.0,
+   "payoff_up": 5362.0
+  },
+  {
+   "ticker": "APH",
+   "verdict": "ADD-REVIEW",
+   "score": 0.789,
+   "best": "Bull call spread",
+   "expiry": "2027-06-17",
+   "p_recover": 0.791,
+   "cost": 400.0,
+   "max_loss": 400.0,
+   "payoff_up": 343.0
   },
   {
    "ticker": "META",
    "verdict": "ADD-REVIEW",
-   "score": 0.882,
+   "score": 0.77,
    "best": "Bull call spread",
    "expiry": "2027-12-17",
-   "p_recover": 0.714,
-   "cost": 5445.0,
-   "max_loss": 5445.0,
-   "payoff_up": 9537.0
+   "p_recover": 0.667,
+   "cost": 5420.0,
+   "max_loss": 5420.0,
+   "payoff_up": 9562.0
   },
   {
    "ticker": "UBER",
    "verdict": "ADD-REVIEW",
-   "score": 0.659,
+   "score": 0.523,
    "best": "Bull call spread",
    "expiry": "2028-06-16",
-   "p_recover": 0.75,
-   "cost": 880.0,
-   "max_loss": 880.0,
-   "payoff_up": 1526.0
+   "p_recover": 0.667,
+   "cost": 875.0,
+   "max_loss": 875.0,
+   "payoff_up": 1531.0
+  },
+  {
+   "ticker": "GLW",
+   "verdict": "ADD-REVIEW",
+   "score": 0.482,
+   "best": "Bull call spread",
+   "expiry": "2029-01-19",
+   "p_recover": 0.5,
+   "cost": 2920.0,
+   "max_loss": 2920.0,
+   "payoff_up": 9080.0
   },
   {
    "ticker": "GOOGL",
    "verdict": "ADD-REVIEW (masters-confirmed)",
-   "score": 0.551,
+   "score": 0.477,
    "best": "Bull call spread",
    "expiry": "2028-12-15",
-   "p_recover": 0.8,
-   "cost": 4035.0,
-   "max_loss": 4035.0,
-   "payoff_up": 6826.0
-  },
-  {
-   "ticker": "GOOG",
-   "verdict": "ADD-REVIEW (masters-confirmed)",
-   "score": 0.55,
-   "best": "Bull call spread",
-   "expiry": "2028-12-15",
-   "p_recover": 0.8,
+   "p_recover": 0.714,
    "cost": 3885.0,
    "max_loss": 3885.0,
-   "payoff_up": 6562.0
-  },
-  {
-   "ticker": "CIEN",
-   "verdict": "ADD-REVIEW (flagged)",
-   "score": 0.526,
-   "best": "Shares (no options)",
-   "expiry": "2029-01-19",
-   "p_recover": 1.0,
-   "cost": 29455.5,
-   "max_loss": 29455.5,
-   "payoff_up": 34295.5
-  },
-  {
-   "ticker": "VRT",
-   "verdict": "ADD-REVIEW",
-   "score": 0.489,
-   "best": "Shares (no options)",
-   "expiry": "2027-12-17",
-   "p_recover": 0.667,
-   "cost": 21177.0,
-   "max_loss": 21177.0,
-   "payoff_up": 16816.5
+   "payoff_up": 6976.0
   },
   {
    "ticker": "NFLX",
@@ -702,6 +706,17 @@
    "cost": 1235.0,
    "max_loss": 1235.0,
    "payoff_up": 3765.0
+  },
+  {
+   "ticker": "GOOG",
+   "verdict": "ADD-REVIEW (masters-confirmed)",
+   "score": 0.44,
+   "best": "Bull call spread",
+   "expiry": "2028-12-15",
+   "p_recover": 0.714,
+   "cost": 3885.0,
+   "max_loss": 3885.0,
+   "payoff_up": 6562.0
   }
  ]
 }
