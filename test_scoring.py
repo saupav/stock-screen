@@ -221,6 +221,17 @@ for _ in range(3):
     _paper.fill(_s3, {"B": 100.0}, {}, _now)
 check(_s3["positions"][0]["status"] == "not filled" and _paper.totals(_s3)["invested"] == 0,
       "paper: a pick with no live option quotes after 3 tries is marked not filled and never counts")
+_s4 = _paper.empty()
+check(_paper.pick_day(_s4, [], _opts, _d1) == 0 and _paper.picked_today(_s4, _d1) and not _paper.picked_today(_s4, _d2),
+      "paper: a day with no picks still counts as done, so backup runs don't redo it")
+_s5 = _paper.empty(); _paper.pick_day(_s5, _best[:1], _opts, _d1, "2026-11-12T08:45-06:00")
+check(_s5["positions"][0]["picked_at"] == "2026-11-12T08:45-06:00", "paper: records when a pick was made")
+import screen as _screen
+_ch_tz = _dt.timezone(_dt.timedelta(hours=-6))
+check(not _screen.after_open(_dt.datetime(2026, 11, 13, 8, 20, tzinfo=_ch_tz))
+      and _screen.after_open(_dt.datetime(2026, 11, 13, 8, 45, tzinfo=_ch_tz))
+      and not _screen.after_open(_dt.datetime(2026, 11, 14, 10, 0, tzinfo=_ch_tz)),
+      "catch-up: buys wait for the open on weekdays")
 json.dumps(st, allow_nan=False)
 
 # ---- strategies and attention

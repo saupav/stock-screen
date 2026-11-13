@@ -234,12 +234,19 @@ def run_paper(best, opt, stocks, P, treasury, path, buy=False):
                 m = sum(lr) / len(lr)
                 vols[t] = 1.1 * math.sqrt(sum((x - m) ** 2 for x in lr) / (len(lr) - 1) * 252)
     closed = paper.mark(state, spots, chains, vols, today, r=treasury or 0.04)
-    added = paper.pick_day(state, best, opt, today) if buy else 0
+    added = paper.pick_day(state, best, opt, today, chicago_now().isoformat(timespec="minutes")) if buy else 0
     line = paper.record(state, today)
     path.write_text(json.dumps(state, separators=(",", ":"), allow_nan=False))
     print(f"Paper portfolio: {added} picked to buy at the open, {closed} closed, "
           f"value ${line['value']:,.0f} on ${line['invested']:,.0f}")
     return state
+
+
+MARKET_OPEN = dt.time(8, 31)  # Chicago; the NYSE opens at 8:30 AM Central all year
+
+
+def after_open(now):
+    return now.weekday() < 5 and now.time() >= MARKET_OPEN
 
 
 def fill_only(out):
@@ -251,12 +258,25 @@ def fill_only(out):
     if not pend:
         print("Paper portfolio: nothing waiting to buy.")
         return
+    if not after_open(now):
+        print("Paper portfolio: the market isn't open yet, buying later.")
+        return
+    # Picks made before the open buy at the opening price; a catch-up pick made after the open
+    # buys at the live price now, so it never gets a price from before it was chosen.
+    late = {p["ticker"] for p in pend
+            if (p.get("picked_at") or "")[:10] == now.date().isoformat()
+            and (p.get("picked_at") or "")[11:16] >= MARKET_OPEN.strftime("%H:%M")}
     opens = {}
     for t in sorted({p["ticker"] for p in pend}):
         try:
-            h = with_retry(lambda: yf.Ticker(t).history(period="5d", interval="1d", auto_adjust=False))
-            if len(h) and h.index[-1].date() == now.date() and h["Open"].iloc[-1] > 0:
-                opens[t] = float(h["Open"].iloc[-1])
+            if t in late:
+                v = float(with_retry(lambda: yf.Ticker(t).fast_info["last_price"]))
+                if v > 0:
+                    opens[t] = v
+            else:
+                h = with_retry(lambda: yf.Ticker(t).history(period="5d", interval="1d", auto_adjust=False))
+                if len(h) and h.index[-1].date() == now.date() and h["Open"].iloc[-1] > 0:
+                    opens[t] = float(h["Open"].iloc[-1])
         except Exception as e:
             print(f"paper open {t}: {e}", file=sys.stderr)
         time.sleep(1.0)
@@ -268,6 +288,9 @@ def fill_only(out):
             print(f"paper quotes {t} {e}: {ex}", file=sys.stderr)
         time.sleep(1.0)
     n = paper.fill(state, opens, chains, now)
+    for p in state["positions"]:
+        if p["ticker"] in late and p["status"] == "open" and p.get("filled_at") == now.isoformat(timespec="minutes"):
+            p["mark_source"] = "bought at the live price (picked after the open)"
     line = paper.record(state, now.date())
     path.write_text(json.dumps(state, separators=(",", ":"), allow_nan=False))
     for name in ("results.json", "summary.json"):
@@ -298,11 +321,25 @@ def main():
                     help="record today's best five as pending buys (the scheduled morning run only)")
     ap.add_argument("--fill-only", action="store_true",
                     help="after the open: buy the pending picks and update the paper numbers, nothing else")
+    ap.add_argument("--scheduled", action="store_true",
+                    help="do whatever today still needs: the morning screen and picks if they haven't "
+                         "happened yet, then the buys once the market is open; safe to run many times")
     ap.add_argument("--out", default=str(ROOT / "docs" / "results.json"))
     a = ap.parse_args()
     if a.fill_only:
         fill_only(Path(a.out))
         return
+    if a.scheduled:
+        now = chicago_now()
+        if now.weekday() >= 5:
+            print("Weekend: nothing to do.")
+            return
+        if paper.picked_today(paper.load(Path(a.out).parent / "paper.json"), now.date()):
+            print(f"Today's screen and picks are already done ({now:%Y-%m-%d}).")
+            fill_only(Path(a.out))
+            return
+        print(f"No picks yet for {now:%Y-%m-%d}: running the morning screen.")
+        a.paper_buy = True
 
     extras = read_list(ROOT / "tickers_extra.txt") if (ROOT / "tickers_extra.txt").exists() else []
     universe = list(dict.fromkeys(sp500() + extras))
@@ -476,6 +513,8 @@ def main():
     print(json.dumps(summary, indent=1))
     if len(stocks) < 0.8 * len(universe):
         print(f"WARNING: only {len(stocks)}/{len(universe)} tickers fetched", file=sys.stderr)
+    if a.scheduled and after_open(chicago_now()):
+        fill_only(out)
 
 
 if __name__ == "__main__":

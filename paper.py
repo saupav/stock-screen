@@ -6,6 +6,10 @@ this file just records what the money would be worth if it had followed the card
 Rules (ASSUMPTION: chosen defaults, not from the written screen rules):
 - Picks: the scheduled morning run (6:15 AM Chicago, before the open) records that day's
   "best_today" five as pending buys, in the structure each card shows.
+- Catch-up: GitHub sometimes starts a scheduled run late or not at all, so backup runs repeat
+  the morning step when no picks exist yet for the day. A pick made after the open is bought at
+  the live price when it's bought, not at that morning's opening price, so it never gets a price
+  from before the moment it was chosen.
 - Fills: a second run shortly after the open (9:00 AM Chicago in winter, 10:00 AM in summer)
   buys them: shares at that day's opening price, options at the mid of each leg's live bid and
   ask at that moment. A pick with no live quote stays pending and is tried again on the next fill
@@ -36,7 +40,7 @@ DAYS_PER_MONTH = 30.44
 
 
 def empty():
-    return {"stake": STAKE, "started": None, "positions": [], "history": [], "notes": []}
+    return {"stake": STAKE, "started": None, "last_pick_day": None, "positions": [], "history": [], "notes": []}
 
 
 def load(path: Path):
@@ -61,11 +65,17 @@ def _live_mid(row):
     return (b + a) / 2 if b > 0 and a > 0 else None
 
 
-def pick_day(state, best, options, today: dt.date):
+def picked_today(state, today: dt.date):
+    d = today.isoformat()
+    return state.get("last_pick_day") == d or any(p["opened"] == d for p in state["positions"])
+
+
+def pick_day(state, best, options, today: dt.date, picked_at: str | None = None):
     """Record today's five as pending buys, once per weekday. Returns how many were added."""
     d = today.isoformat()
-    if today.weekday() >= 5 or any(p["opened"] == d for p in state["positions"]):
+    if today.weekday() >= 5 or picked_today(state, today):
         return 0
+    state["last_pick_day"] = d
     added = 0
     for c in best:
         t, name = c["ticker"], c.get("structure")
@@ -80,7 +90,7 @@ def pick_day(state, best, options, today: dt.date):
             "structure": name, "kind": kind, "legs": [{k: l[k] for k in ("side", "type", "strike")} for l in st["legs"]],
             "expiry": st.get("expiry"), "target": o.get("up_price"), "months": st.get("months") or 12,
             "stop_date": None, "qty": 0.0, "unit_in": None, "invested": 0.0, "unit": None, "value": 0.0,
-            "spot_in": None, "filled_at": None, "fill_tries": 0, "mark_date": None, "mark_source": "waiting for the open",
+            "spot_in": None, "picked_at": picked_at, "filled_at": None, "fill_tries": 0, "mark_date": None, "mark_source": "waiting for the open",
             "status": "pending", "closed": None, "exit_reason": None,
         })
         added += 1

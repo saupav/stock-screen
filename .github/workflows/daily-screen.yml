@@ -1,15 +1,27 @@
 name: Daily stock screen
 
 on:
+  # GitHub starts scheduled runs late, and sometimes drops one, so there are backups. Every
+  # start runs "screen.py --scheduled", which does only what today still needs: the morning
+  # screen and picks if they haven't happened yet, then the pretend buys once the market is open.
+  # A start with nothing left to do finishes in about a minute.
   schedule:
-    # 12:15 UTC = 6:15 AM Chicago in winter (CST), 7:15 AM in summer (CDT).
-    # GitHub can start scheduled runs late, so this leaves room before 8 AM.
+    # Morning: 12:15, 12:50 and 13:20 UTC = 6:15, 6:50 and 7:20 AM Chicago in winter (CST),
+    # an hour later in summer (CDT).
     - cron: "15 12 * * 1-5"
-    # 15:00 UTC = 9:00 AM Chicago in winter, 10:00 AM in summer: after the open, buy the
-    # morning's pretend-portfolio picks at the opening price and live option quotes.
-    - cron: "0 15 * * 1-5"
+    - cron: "50 12 * * 1-5"
+    - cron: "20 13 * * 1-5"
+    # After the open: 15:07 and 15:40 UTC = 9:07 and 9:40 AM Chicago in winter, 10:07 and 10:40
+    # in summer. Buys the morning's picks (and catches up the morning step if every start above
+    # was missed). Off the top of the hour, when GitHub is busiest.
+    - cron: "7 15 * * 1-5"
+    - cron: "40 15 * * 1-5"
+    # Last catch-up: 17:30 UTC = 11:30 AM Chicago in winter.
+    - cron: "30 17 * * 1-5"
+  # "Run workflow" on the Actions tab does the same catch-up as a scheduled start.
   workflow_dispatch: {}
   # Also run when the screen's code changes, so a fix shows up without waiting for the morning.
+  # A pushed commit whose message contains [morning] does the scheduled catch-up too.
   # The job's own results commits use the built-in token, which never starts another run.
   push:
     branches: [main]
@@ -32,6 +44,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main  # the latest results, so a queued backup sees what an earlier start did
 
       - uses: actions/setup-python@v5
         with:
@@ -53,12 +67,11 @@ jobs:
           REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
         run: |
-          if [ "$EVENT_SCHEDULE" = "0 15 * * 1-5" ]; then
-            python screen.py --fill-only
-          elif [ "$EVENT_NAME" = "schedule" ]; then
-            python screen.py --workers 2 --paper-buy
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ] || \
+             { [ "$EVENT_NAME" = "push" ] && printf '%s' "$HEAD_MSG" | grep -qF '[morning]'; }; then
+            python screen.py --workers 2 --scheduled
           else
             python screen.py --workers 2
           fi
@@ -71,4 +84,5 @@ jobs:
           if [ -f docs/paper.json ]; then git add docs/paper.json; fi
           if [ -f sp500_fallback.txt ]; then git add sp500_fallback.txt; fi
           git diff --cached --quiet || git commit -m "Screen results $(date -u +%F)"
+          git pull --rebase -X theirs origin main || git rebase --abort
           git push
