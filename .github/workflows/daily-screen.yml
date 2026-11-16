@@ -30,6 +30,8 @@ on:
       - "requirements.txt"
       - "tickers_extra.txt"
       - ".github/workflows/daily-screen.yml"
+      # Changing run-now.txt with [morning] in the commit message starts today's catch-up by hand.
+      - "run-now.txt"
 
 permissions:
   contents: write
