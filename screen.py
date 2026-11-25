@@ -243,10 +243,29 @@ def run_paper(best, opt, stocks, P, treasury, path, buy=False):
 
 
 MARKET_OPEN = dt.time(8, 31)  # Chicago; the NYSE opens at 8:30 AM Central all year
+MARKET_CLOSE = dt.time(15, 0)  # 3 PM Central
+EARLY_CLOSE = dt.time(12, 0)  # noon Central on the NYSE's half days
+# NYSE full-day closures. No screen, picks or pretend buys on these days, so nothing is bought
+# at the day before's prices. Extend this list each year from the NYSE holiday calendar.
+NYSE_HOLIDAYS = {dt.date.fromisoformat(d) for d in (
+    "2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19",
+    "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+    "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18",
+    "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24")}
+NYSE_EARLY_CLOSE = {dt.date.fromisoformat(d) for d in ("2026-11-27", "2026-12-24", "2027-11-26")}
+
+
+def trading_day(d):
+    return d.weekday() < 5 and d not in NYSE_HOLIDAYS
+
+
+def market_close(d):
+    return EARLY_CLOSE if d in NYSE_EARLY_CLOSE else MARKET_CLOSE
 
 
 def after_open(now):
-    return now.weekday() < 5 and now.time() >= MARKET_OPEN
+    """True while the market is open today, so a buy gets a price from today's session."""
+    return trading_day(now.date()) and MARKET_OPEN <= now.time() < market_close(now.date())
 
 
 def fill_only(out):
@@ -259,7 +278,7 @@ def fill_only(out):
         print("Paper portfolio: nothing waiting to buy.")
         return
     if not after_open(now):
-        print("Paper portfolio: the market isn't open yet, buying later.")
+        print("Paper portfolio: the market isn't open now, buying at the next open.")
         return
     # Picks made before the open buy at the opening price; a catch-up pick made after the open
     # buys at the live price now, so it never gets a price from before it was chosen.
@@ -331,8 +350,8 @@ def main():
         return
     if a.scheduled:
         now = chicago_now()
-        if now.weekday() >= 5:
-            print("Weekend: nothing to do.")
+        if not trading_day(now.date()):
+            print(f"Market closed today ({now:%Y-%m-%d}): nothing to do.")
             return
         if paper.picked_today(paper.load(Path(a.out).parent / "paper.json"), now.date()):
             print(f"Today's screen and picks are already done ({now:%Y-%m-%d}).")

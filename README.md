@@ -47,6 +47,12 @@ at the mid of each leg's live bid and ask. A pick without live quotes waits for 
 run; after 3 tries it's marked not bought and never counts. Runs started by a code change don't
 pick or buy anything, unless the commit message contains `[morning]`.
 
+On NYSE holidays (`NYSE_HOLIDAYS` in `screen.py`, e.g. Thanksgiving) nothing is screened, picked
+or bought. Buys happen only while the market is open, 8:31 AM to 3 PM Chicago, or to noon on half
+days (`NYSE_EARLY_CLOSE`, e.g. the Friday after Thanksgiving). A pick made after the close waits
+and buys at the next trading day's open, so nothing is ever bought at a stale price. Add next year's
+dates to both lists each December.
+
 GitHub sometimes starts a scheduled run late or skips it (it skipped the first one, on Nov 13, 2026).
 So every scheduled start, a "Run workflow" press on the Actions tab and a `[morning]` push all run
 `screen.py --scheduled`, which does only what the day still needs: the morning screen and picks if
